@@ -1,0 +1,5 @@
+{
+  "name": "SmartBlog",
+  "description": "An intelligent blogging platform featuring AI-powered tag suggestions, mood-based themes, advanced reactions, and secure OTP authentication.",
+  "requestFramePermissions": []
+}

@@ -1,0 +1,31 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  
+  --color-focus-bg: #f8fafc;
+  --color-focus-text: #0f172a;
+  --color-creative-bg: #faf5ff;
+  --color-creative-accent: #9333ea;
+}
+
+@layer base {
+  body {
+    @apply transition-colors duration-300;
+  }
+  
+  .theme-light {
+    background-color: #ffffff;
+    color: #0f172a;
+  }
+  
+  .theme-orange {
+    background-color: #000000;
+    color: #ff8c00;
+  }
+}
+
+.markdown-body {
+  @apply prose prose-slate max-w-none;
+}

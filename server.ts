@@ -100,6 +100,17 @@ db.exec(`
     FOREIGN KEY(blog_id) REFERENCES blogs(id),
     FOREIGN KEY(tag_id) REFERENCES tags(id)
   );
+
+  CREATE TABLE IF NOT EXISTS admin_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    admin_id INTEGER NOT NULL,
+    action TEXT NOT NULL,
+    target_type TEXT NOT NULL,
+    target_id INTEGER,
+    details TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(admin_id) REFERENCES users(id)
+  );
 `);
 
 // Migration: Add password column if it doesn't exist
@@ -234,6 +245,38 @@ async function startServer() {
     res.json(blogs);
   });
 
+  app.get("/api/admin/dashboard-stats", (req, res) => {
+    const { userId } = req.query;
+    if (!userId) return res.status(400).json({ error: "User ID required" });
+
+    const user = db.prepare("SELECT role FROM users WHERE id = ?").get(userId) as any;
+    if (!user || user.role !== 'admin') {
+      return res.status(403).json({ error: "Unauthorized. Admin access required." });
+    }
+
+    try {
+      const totalBlogs = db.prepare("SELECT COUNT(*) as count FROM blogs").get() as any;
+      const totalUsers = db.prepare("SELECT COUNT(*) as count FROM users").get() as any;
+      const totalViews = db.prepare("SELECT SUM(views) as count FROM blogs").get() as any;
+      const recentActions = db.prepare(`
+        SELECT l.*, u.username as admin_name 
+        FROM admin_logs l 
+        JOIN users u ON l.admin_id = u.id 
+        ORDER BY l.created_at DESC 
+        LIMIT 5
+      `).all();
+
+      res.json({
+        totalBlogs: totalBlogs.count,
+        totalUsers: totalUsers.count,
+        totalViews: totalViews.count || 0,
+        recentActions
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch stats" });
+    }
+  });
+
   app.patch("/api/admin/blogs/:id", (req, res) => {
     const { userId, visibility, status } = req.body;
     if (!userId) return res.status(400).json({ error: "User ID required" });
@@ -246,9 +289,15 @@ async function startServer() {
     try {
       if (visibility) {
         db.prepare("UPDATE blogs SET visibility = ? WHERE id = ?").run(visibility, req.params.id);
+        db.prepare("INSERT INTO admin_logs (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)").run(
+          userId, 'update_visibility', 'blog', req.params.id, `Set visibility to ${visibility}`
+        );
       }
       if (status) {
         db.prepare("UPDATE blogs SET status = ? WHERE id = ?").run(status, req.params.id);
+        db.prepare("INSERT INTO admin_logs (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)").run(
+          userId, 'update_status', 'blog', req.params.id, `Set status to ${status}`
+        );
       }
       res.json({ success: true });
     } catch (error) {
@@ -266,11 +315,17 @@ async function startServer() {
     }
 
     try {
+      const blog = db.prepare("SELECT title FROM blogs WHERE id = ?").get(req.params.id) as any;
       db.prepare("DELETE FROM blog_tags WHERE blog_id = ?").run(req.params.id);
       db.prepare("DELETE FROM blog_versions WHERE blog_id = ?").run(req.params.id);
       db.prepare("DELETE FROM reactions WHERE blog_id = ?").run(req.params.id);
       db.prepare("DELETE FROM comments WHERE blog_id = ?").run(req.params.id);
       db.prepare("DELETE FROM blogs WHERE id = ?").run(req.params.id);
+
+      db.prepare("INSERT INTO admin_logs (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)").run(
+        userId, 'delete_blog', 'blog', req.params.id, `Deleted blog: ${blog?.title || 'Unknown'}`
+      );
+
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete blog" });

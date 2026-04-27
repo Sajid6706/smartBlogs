@@ -12,7 +12,12 @@ import {
   AlertCircle,
   MoreVertical,
   User,
-  Clock
+  Clock,
+  Activity,
+  Users,
+  FileText,
+  BarChart3,
+  History
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatDistanceToNow } from 'date-fns';
@@ -21,10 +26,27 @@ import { apiFetch } from '../lib/api';
 export const AdminPanel = ({ onBack, onSelectBlog }: { onBack: () => void, onSelectBlog: (id: number) => void }) => {
   const { user, theme } = useStore();
   const [blogs, setBlogs] = useState<any[]>([]);
+  const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [actionLoading, setActionLoading] = useState<number | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
+  const fetchDashboardData = async () => {
+    setStatsLoading(true);
+    try {
+      const res = await apiFetch(`/api/admin/dashboard-stats?userId=${user?.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setStats(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch stats", error);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
 
   const fetchAllBlogs = async () => {
     setLoading(true);
@@ -47,6 +69,7 @@ export const AdminPanel = ({ onBack, onSelectBlog }: { onBack: () => void, onSel
   useEffect(() => {
     if (user?.role === 'admin') {
       fetchAllBlogs();
+      fetchDashboardData();
     }
   }, [user]);
 
@@ -60,6 +83,7 @@ export const AdminPanel = ({ onBack, onSelectBlog }: { onBack: () => void, onSel
       if (res.ok) {
         setBlogs(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b));
         setMessage({ type: 'success', text: 'Blog updated successfully' });
+        fetchDashboardData(); // Refresh history
       } else {
         const err = await res.json();
         setMessage({ type: 'error', text: err.error || 'Update failed' });
@@ -73,6 +97,7 @@ export const AdminPanel = ({ onBack, onSelectBlog }: { onBack: () => void, onSel
   };
 
   const handleDeleteBlog = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this blog?')) return;
     setActionLoading(id);
     try {
       const res = await apiFetch(`/api/admin/blogs/${id}?userId=${user?.id}`, {
@@ -81,6 +106,7 @@ export const AdminPanel = ({ onBack, onSelectBlog }: { onBack: () => void, onSel
       if (res.ok) {
         setBlogs(prev => prev.filter(b => b.id !== id));
         setMessage({ type: 'success', text: 'Blog deleted successfully' });
+        fetchDashboardData(); // Refresh history
       } else {
         const err = await res.json();
         setMessage({ type: 'error', text: err.error || 'Delete failed' });
@@ -149,7 +175,90 @@ export const AdminPanel = ({ onBack, onSelectBlog }: { onBack: () => void, onSel
         </div>
       </div>
 
-      <AnimatePresence>
+      {/* Stats Dashboard */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+        <StatCard 
+          icon={FileText} 
+          label="Total Blogs" 
+          value={stats?.totalBlogs || 0} 
+          loading={statsLoading} 
+          theme={theme} 
+          color="text-indigo-600" 
+          bgColor="bg-indigo-500/10"
+        />
+        <StatCard 
+          icon={Users} 
+          label="Total Users" 
+          value={stats?.totalUsers || 0} 
+          loading={statsLoading} 
+          theme={theme} 
+          color="text-emerald-500" 
+          bgColor="bg-emerald-500/10"
+        />
+        <StatCard 
+          icon={BarChart3} 
+          label="Total Views" 
+          value={stats?.totalViews || 0} 
+          loading={statsLoading} 
+          theme={theme} 
+          color="text-orange-500" 
+          bgColor="bg-orange-500/10"
+        />
+        <StatCard 
+          icon={Activity} 
+          label="Admin Actions" 
+          value={stats?.recentActions?.length || 0} 
+          loading={statsLoading} 
+          theme={theme} 
+          color="text-rose-500" 
+          bgColor="bg-rose-500/10"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-12">
+        {/* Recent Admin Actions */}
+        <div className="lg:col-span-4">
+          <div className={`p-8 rounded-[2.5rem] border shadow-sm h-full ${cardClasses}`}>
+            <h2 className="text-xl font-black mb-8 flex items-center gap-3 uppercase tracking-widest italic text-indigo-600">
+              <History className="w-5 h-5" /> Recent Actions
+            </h2>
+            
+            {statsLoading ? (
+              <div className="space-y-4 opacity-40">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="h-16 bg-slate-100 rounded-2xl animate-pulse" />
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {stats?.recentActions?.length === 0 ? (
+                  <p className="text-xs font-bold opacity-40 text-center py-10">No recent actions recorded.</p>
+                ) : (
+                  stats?.recentActions?.map((log: any) => (
+                    <div key={log.id} className="relative pl-6 border-l-2 border-indigo-500/20">
+                      <div className="absolute left-[-9px] top-0 w-4 h-4 bg-indigo-500 rounded-full border-4 border-white" />
+                      <p className="text-xs font-black uppercase tracking-tight mb-1">{log.details}</p>
+                      <div className="flex items-center gap-2 text-[10px] font-bold opacity-40 uppercase tracking-widest">
+                        <span>{log.admin_name}</span>
+                        <span>â€¢</span>
+                        <span>{formatDistanceToNow(new Date(log.created_at))} ago</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Blog Management Table */}
+        <div className="lg:col-span-8">
+          <div className={`p-8 rounded-[2.5rem] border shadow-sm ${cardClasses}`}>
+            <h2 className="text-xl font-black mb-8 flex items-center gap-3 uppercase tracking-widest italic text-indigo-600">
+              <FileText className="w-5 h-5" /> Blog Management
+            </h2>
+
+            <AnimatePresence>
         {message && (
           <motion.div
             initial={{ opacity: 0, y: -20 }}
@@ -232,6 +341,33 @@ export const AdminPanel = ({ onBack, onSelectBlog }: { onBack: () => void, onSel
           )}
         </div>
       )}
+            </div>
+          </div>
+        </div>
+    </div>
+  );
+};
+
+const StatCard = ({ icon: Icon, label, value, loading, theme, color, bgColor }: any) => {
+  const cardClasses = theme === 'orange' 
+    ? 'bg-zinc-900/50 border-orange-500/20' 
+    : 'bg-white border-slate-200 shadow-sm';
+
+  return (
+    <div className={`p-6 rounded-[2rem] border ${cardClasses}`}>
+      <div className="flex items-center gap-4">
+        <div className={`p-3 rounded-2xl ${bgColor} ${color}`}>
+          <Icon className="w-6 h-6" />
+        </div>
+        <div>
+          {loading ? (
+            <div className="h-6 w-16 bg-slate-100 animate-pulse rounded-md mb-1" />
+          ) : (
+            <p className={`text-2xl font-black ${theme === 'orange' ? 'text-white' : 'text-slate-900'}`}>{value}</p>
+          )}
+          <p className="text-[10px] font-bold uppercase tracking-widest opacity-40">{label}</p>
+        </div>
+      </div>
     </div>
   );
 };

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, ShieldCheck, Loader2, Lock, User as UserIcon, ArrowLeft, Moon, Info, Zap } from 'lucide-react';
+import { Mail, ShieldCheck, Loader2, Lock, User as UserIcon, ArrowLeft, Moon, Info, Zap, Sun, UserCircle } from 'lucide-react';
 import emailjs from '@emailjs/browser';
 import { useStore } from '../store';
 import { motion, AnimatePresence } from 'motion/react';
+import { apiFetch } from '../lib/api';
 
 const TypingText = ({ text }: { text: string }) => {
   const [displayedText, setDisplayedText] = useState('');
@@ -47,6 +48,7 @@ export const Auth = () => {
   const [showAbout, setShowAbout] = useState(false);
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { setUser, theme, setTheme } = useStore();
 
   const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
@@ -54,25 +56,25 @@ export const Auth = () => {
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
     
     try {
-      const checkRes = await fetch('/api/auth/check-email', {
+      const checkRes = await apiFetch('/api/auth/check-email', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
 
-      // If email is available, it means user doesn't exist
+      // If email is available (200 OK), it means user doesn't exist
       if (checkRes.ok) {
-        alert("No account found with this email.");
+        setError("No account found with this email.");
         setLoading(false);
         return;
       }
 
       const newOtp = generateOTP();
-      const serviceId = process.env.VITE_EMAILJS_SERVICE_ID || "service_67f772n";
-      const templateId = process.env.VITE_EMAILJS_TEMPLATE_ID || "template_5pvqoh3";
-      const publicKey = process.env.VITE_EMAILJS_PUBLIC_KEY || "_CVskgaXxQLa-k1ik";
+      const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID || "service_67f772n";
+      const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || "template_5pvqoh3";
+      const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || "_CVskgaXxQLa-k1ik";
 
       if (serviceId && templateId && publicKey) {
         await emailjs.send(serviceId, templateId, {
@@ -93,26 +95,27 @@ export const Auth = () => {
 
   const handleVerifyResetOTP = (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     if (otp === sentOtp) {
       setStep('new-password');
     } else {
-      alert("Invalid OTP");
+      setError("Invalid OTP code. Please try again.");
     }
   };
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
     try {
-      const res = await fetch('/api/auth/reset-password', {
+      const res = await apiFetch('/api/auth/reset-password', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, newPassword }),
       });
       
       if (!res.ok) {
-        const error = await res.json();
-        alert(error.error);
+        const errorData = await res.json();
+        setError(errorData.error);
         setLoading(false);
         return;
       }
@@ -120,8 +123,11 @@ export const Auth = () => {
       alert("Password reset successfully! Please login.");
       setStep('info');
       setMode('login');
+      setPassword('');
+      setNewPassword('');
+      setOtp('');
     } catch (error) {
-      alert("Failed to reset password.");
+      setError("Failed to reset password. Please try again later.");
     } finally {
       setLoading(false);
     }
@@ -130,18 +136,18 @@ export const Auth = () => {
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
     
     try {
       if (mode === 'login') {
-        const res = await fetch('/api/auth/login', {
+        const res = await apiFetch('/api/auth/login', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: email.trim(), password }),
         });
 
         if (!res.ok) {
-          const error = await res.json();
-          alert(error.error);
+          const errorData = await res.json();
+          setError(errorData.error);
           setLoading(false);
           return;
         }
@@ -149,23 +155,22 @@ export const Auth = () => {
         const user = await res.json();
         setUser(user);
       } else {
-        const checkRes = await fetch('/api/auth/check-email', {
+        const checkRes = await apiFetch('/api/auth/check-email', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: email.trim() }),
         });
 
         if (!checkRes.ok) {
-          const error = await checkRes.json();
-          alert(error.error);
+          const errorData = await checkRes.json();
+          setError(errorData.error);
           setLoading(false);
           return;
         }
 
         const newOtp = generateOTP();
-        const serviceId = process.env.VITE_EMAILJS_SERVICE_ID || "service_67f772n";
-        const templateId = process.env.VITE_EMAILJS_TEMPLATE_ID || "template_5pvqoh3";
-        const publicKey = process.env.VITE_EMAILJS_PUBLIC_KEY || "_CVskgaXxQLa-k1ik";
+        const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID || "service_67f772n";
+        const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || "template_5pvqoh3";
+        const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || "_CVskgaXxQLa-k1ik";
 
         if (serviceId && templateId && publicKey) {
           try {
@@ -183,7 +188,7 @@ export const Auth = () => {
         setStep('otp');
       }
     } catch (error: any) {
-      alert(error.message || "Authentication failed.");
+      setError(error.message || "Authentication failed. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -191,18 +196,18 @@ export const Auth = () => {
 
   const handleVerifyOTP = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     if (otp === sentOtp) {
       setLoading(true);
       try {
-        const res = await fetch('/api/auth/register', {
+        const res = await apiFetch('/api/auth/register', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: email.trim(), username: username.trim(), password }),
         });
         
         if (!res.ok) {
-          const error = await res.json();
-          alert(error.error);
+          const errorData = await res.json();
+          setError(errorData.error);
           setLoading(false);
           return;
         }
@@ -210,22 +215,20 @@ export const Auth = () => {
         const user = await res.json();
         setUser(user);
       } catch (error) {
-        console.error("Registration Error:", error);
+        setError("Registration failed. Please try again.");
       } finally {
         setLoading(false);
       }
     } else {
-      alert("Invalid OTP");
+      setError("Invalid OTP code.");
     }
   };
 
   const getThemeClasses = () => {
     switch (theme) {
-      case 'dark': return 'bg-slate-900 text-white';
       case 'orange': return 'bg-black text-[#ff8c00]';
-      case 'focus': return 'bg-stone-50 text-stone-900';
-      case 'creative': return 'bg-indigo-50 text-indigo-900';
-      default: return 'bg-slate-50 text-slate-900';
+      case 'light': return 'bg-white text-slate-900';
+      default: return 'bg-white text-slate-900';
     }
   };
 
@@ -238,10 +241,10 @@ export const Auth = () => {
         </div>
         <div className="flex items-center gap-6">
           <button 
-            onClick={() => setTheme(theme === 'dark' ? 'orange' : 'dark')}
-            className={`p-2 rounded-full transition-colors ${theme === 'orange' ? 'hover:bg-orange-500/10' : 'hover:bg-slate-800'}`}
+            onClick={() => setTheme(theme === 'light' ? 'orange' : 'light')}
+            className={`p-2 rounded-full transition-colors ${theme === 'orange' ? 'hover:bg-orange-500/10' : 'hover:bg-slate-200'}`}
           >
-            {theme === 'dark' ? <Zap className="w-6 h-6" /> : <Moon className="w-6 h-6" />}
+            {theme === 'light' ? <Moon className="w-6 h-6" /> : <Sun className="w-6 h-6" />}
           </button>
           <button 
             onClick={() => setShowAbout(true)}
@@ -334,6 +337,16 @@ export const Auth = () => {
               {step === 'otp' ? 'Verify OTP' : step === 'otp-reset' ? 'Verify OTP' : step === 'new-password' ? 'New Password' : step === 'forgot-password' ? 'Reset Password' : mode === 'login' ? 'Login' : 'Register'}
             </h2>
 
+            {error && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                className={`mb-6 p-4 rounded-xl text-sm font-bold border ${theme === 'orange' ? 'bg-orange-500/10 border-orange-500/20 text-orange-500' : 'bg-red-50 border-red-100 text-red-600'}`}
+              >
+                {error}
+              </motion.div>
+            )}
+
             <AnimatePresence mode="wait">
               {step === 'info' ? (
                 <motion.form 
@@ -389,17 +402,40 @@ export const Auth = () => {
                     </div>
                   </div>
 
-                  {mode === 'login' && (
-                    <div className="text-right">
+                  <div className="flex items-center justify-between mt-4">
+                    {email === 'sajidahmad1001@gmail.com' ? (
                       <button 
-                        type="button" 
-                        onClick={() => setStep('forgot-password')}
-                        className={`text-sm font-bold hover:opacity-80 transition-opacity ${theme === 'orange' ? 'text-orange-500' : 'text-indigo-600'}`}
+                        type="button"
+                        onClick={() => {
+                          setEmail('');
+                          setMode('login');
+                          setError('');
+                        }}
+                        className={`text-[11px] font-black uppercase tracking-widest px-4 py-2 rounded-xl transition-all border ${theme === 'orange' ? 'border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/10' : 'border-emerald-100 text-emerald-600 hover:bg-emerald-50'}`}
                       >
-                        Forgot Password?
+                        <UserCircle className="w-4 h-4 inline-block mr-2" /> User Portal
                       </button>
-                    </div>
-                  )}
+                    ) : (
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          setEmail('sajidahmad1001@gmail.com');
+                          setMode('login');
+                          setError('Admin Portal Activated: Pre-filling admin credentials.');
+                        }}
+                        className={`text-[11px] font-black uppercase tracking-widest px-4 py-2 rounded-xl transition-all border ${theme === 'orange' ? 'border-orange-500/20 text-orange-500 hover:bg-orange-500/10' : 'border-indigo-100 text-indigo-600 hover:bg-indigo-50'}`}
+                      >
+                        <ShieldCheck className="w-4 h-4 inline-block mr-2" /> Admin Access
+                      </button>
+                    )}
+                    <button 
+                      type="button" 
+                      onClick={() => setStep('forgot-password')}
+                      className={`text-sm font-bold hover:opacity-80 transition-opacity ${theme === 'orange' ? 'text-orange-500' : 'text-indigo-600'}`}
+                    >
+                      Forgot Password?
+                    </button>
+                  </div>
 
                   <button
                     disabled={loading}

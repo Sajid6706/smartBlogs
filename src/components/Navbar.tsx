@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store';
 import { 
   User, 
@@ -6,16 +6,18 @@ import {
   Home, 
   FileText, 
   Moon, 
+  Sun, 
   Zap,
   LogOut, 
   Shield,
   UserCircle,
-  ChevronDown
+  ChevronDown,
+  Users
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface NavbarProps {
-  onViewChange: (view: 'dashboard' | 'editor' | 'view', subView?: 'all' | 'my') => void;
+  onViewChange: (view: 'dashboard' | 'editor' | 'view' | 'settings' | 'admin' | 'privacy', subView?: 'all' | 'my') => void;
   currentView: string;
   currentSubView?: string;
 }
@@ -24,10 +26,26 @@ export const Navbar = ({ onViewChange, currentView, currentSubView }: NavbarProp
   const { theme, setTheme, user, logout } = useStore();
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [showSettingsDropdown, setShowSettingsDropdown] = useState(false);
+  
+  const profileRef = useRef<HTMLDivElement>(null);
+  const settingsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+        setShowProfileDropdown(false);
+      }
+      if (settingsRef.current && !settingsRef.current.contains(event.target as Node)) {
+        setShowSettingsDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const getThemeClasses = () => {
     switch (theme) {
-      case 'dark': return 'bg-slate-900/80 border-slate-800 text-white';
+      case 'light': return 'bg-white/80 border-slate-200 text-slate-900';
       case 'orange': return 'bg-black/80 border-orange-900/30 text-[#ff8c00]';
       default: return 'bg-white/80 border-slate-200 text-slate-900';
     }
@@ -35,16 +53,14 @@ export const Navbar = ({ onViewChange, currentView, currentSubView }: NavbarProp
 
   const dropdownClasses = theme === 'orange' 
     ? 'bg-zinc-900 border-orange-500/20 text-orange-100' 
-    : theme === 'dark' 
-      ? 'bg-slate-800 border-slate-700 text-white' 
-      : 'bg-white border-slate-200 text-slate-900';
+    : 'bg-white border-slate-200 text-slate-900';
 
   const itemHoverClasses = theme === 'orange'
     ? 'hover:bg-orange-500/10 hover:text-orange-500'
     : 'hover:bg-slate-100';
 
   const actionBtnClasses = `p-3 rounded-2xl border transition-all ${
-    theme === 'orange' ? 'border-orange-500/20 hover:bg-orange-500/5 text-orange-500' : 'border-slate-200 hover:bg-slate-50 text-slate-600'
+    theme === 'orange' ? 'border-orange-500/20 hover:bg-orange-500/5 text-orange-500' : 'border-slate-200 hover:bg-slate-100 text-slate-900'
   }`;
 
   return (
@@ -62,16 +78,16 @@ export const Navbar = ({ onViewChange, currentView, currentSubView }: NavbarProp
         {/* Desktop Actions */}
         <div className="flex items-center gap-3">
           {/* Main Nav Buttons */}
-          <div className="hidden md:flex items-center gap-2 mr-4">
+          <div className="hidden md:flex items-center gap-2 mr-4 text-inherit">
             <button 
               onClick={() => onViewChange('dashboard', 'all')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-black uppercase tracking-widest transition-all ${currentView === 'dashboard' && currentSubView === 'all' ? 'text-indigo-600 bg-indigo-50' : 'opacity-60 hover:opacity-100'}`}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-black uppercase tracking-widest transition-all ${currentView === 'dashboard' && currentSubView === 'all' ? (theme === 'orange' ? 'text-orange-500 bg-orange-500/10' : 'text-indigo-600 bg-indigo-50') : 'opacity-60 hover:opacity-100'}`}
             >
-              <Home className="w-4 h-4" /> Home
+              <Users className="w-4 h-4" /> All Posts
             </button>
             <button 
               onClick={() => onViewChange('dashboard', 'my')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-black uppercase tracking-widest transition-all ${currentView === 'dashboard' && currentSubView === 'my' ? 'text-indigo-600 bg-indigo-50' : 'opacity-60 hover:opacity-100'}`}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-black uppercase tracking-widest transition-all ${currentView === 'dashboard' && currentSubView === 'my' ? (theme === 'orange' ? 'text-orange-500 bg-orange-500/10' : 'text-indigo-600 bg-indigo-50') : 'opacity-60 hover:opacity-100'}`}
             >
               <FileText className="w-4 h-4" /> My Posts
             </button>
@@ -79,29 +95,33 @@ export const Navbar = ({ onViewChange, currentView, currentSubView }: NavbarProp
 
           {/* Theme Toggle */}
           <button 
-            onClick={() => setTheme(theme === 'dark' ? 'orange' : 'dark')}
+            onClick={() => setTheme(theme === 'light' ? 'orange' : 'light')}
             className={actionBtnClasses}
             title="Toggle Theme"
           >
-            {theme === 'dark' ? <Zap className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
           </button>
 
           {/* Profile Button */}
-          <div className="relative">
+          <div className="relative" ref={profileRef}>
             <button 
               onClick={() => {
                 setShowProfileDropdown(!showProfileDropdown);
                 setShowSettingsDropdown(false);
               }}
               className={`flex items-center gap-3 px-4 py-2 rounded-2xl border transition-all ${
-                theme === 'orange' ? 'border-orange-500/20 hover:bg-orange-500/5' : 'border-slate-200 hover:bg-slate-50'
+                theme === 'orange' ? 'border-orange-500/20 hover:bg-orange-500/5' : 'border-slate-200 hover:bg-slate-100 text-inherit'
               }`}
             >
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
-                theme === 'orange' ? 'bg-orange-500/20 text-orange-500' : 'bg-indigo-600 text-white'
-              }`}>
-                {user?.username?.[0].toUpperCase()}
-              </div>
+              {user?.photo_url ? (
+                <img src={user.photo_url} alt="Profile" className="w-8 h-8 rounded-full object-cover" referrerPolicy="no-referrer" />
+              ) : (
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
+                  theme === 'orange' ? 'bg-orange-500/20 text-orange-500' : 'bg-indigo-600 text-white'
+                }`}>
+                  {user?.username?.[0].toUpperCase()}
+                </div>
+              )}
               <div className="text-left hidden sm:block">
                 <p className="text-xs font-black uppercase tracking-tighter leading-none mb-1">{user?.username}</p>
                 <p className={`text-[10px] font-medium opacity-60 leading-none`}>Account</p>
@@ -125,7 +145,7 @@ export const Navbar = ({ onViewChange, currentView, currentSubView }: NavbarProp
                       }}
                       className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${itemHoverClasses} md:hidden`}
                     >
-                      <Home className="w-4 h-4" /> Home
+                      <Users className="w-4 h-4" /> All Posts
                     </button>
                     <button 
                       onClick={() => {
@@ -136,16 +156,18 @@ export const Navbar = ({ onViewChange, currentView, currentSubView }: NavbarProp
                     >
                       <FileText className="w-4 h-4" /> My Posts
                     </button>
-                    <button 
-                      onClick={() => {
-                        // @ts-ignore
-                        onViewChange('settings');
-                        setShowProfileDropdown(false);
-                      }}
-                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${itemHoverClasses}`}
-                    >
-                      <UserCircle className="w-4 h-4" /> Profile Settings
-                    </button>
+                    
+                    {user?.role === 'admin' && (
+                      <button 
+                        onClick={() => {
+                          onViewChange('admin');
+                          setShowProfileDropdown(false);
+                        }}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${itemHoverClasses} text-indigo-600`}
+                      >
+                        <Shield className="w-4 h-4" /> Admin Panel
+                      </button>
+                    )}
                     <button 
                       onClick={logout}
                       className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all text-rose-500 hover:bg-rose-500/10`}
@@ -159,7 +181,7 @@ export const Navbar = ({ onViewChange, currentView, currentSubView }: NavbarProp
           </div>
 
           {/* Settings Icon */}
-          <div className="relative">
+          <div className="relative" ref={settingsRef}>
             <button 
               onClick={() => {
                 setShowSettingsDropdown(!showSettingsDropdown);
@@ -181,8 +203,16 @@ export const Navbar = ({ onViewChange, currentView, currentSubView }: NavbarProp
                   <div className="p-2 space-y-1">
                     <button 
                       onClick={() => {
-                        // @ts-ignore
                         onViewChange('settings');
+                        setShowSettingsDropdown(false);
+                      }}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${itemHoverClasses}`}
+                    >
+                      <UserCircle className="w-4 h-4" /> Profile Settings
+                    </button>
+                    <button 
+                      onClick={() => {
+                        onViewChange('privacy');
                         setShowSettingsDropdown(false);
                       }}
                       className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${itemHoverClasses}`}

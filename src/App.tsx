@@ -6,11 +6,13 @@ import { BlogEditor } from './components/BlogEditor';
 import { BlogView } from './components/BlogView';
 import { Navbar } from './components/Navbar';
 import { Settings } from './components/Settings';
+import { PrivacySettings } from './components/PrivacySettings';
+import { AdminPanel } from './components/AdminPanel';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function App() {
   const { user, theme } = useStore();
-  const [view, setView] = useState<'dashboard' | 'editor' | 'view' | 'settings'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'editor' | 'view' | 'settings' | 'admin' | 'privacy'>('dashboard');
   const [subView, setSubView] = useState<'all' | 'my'>('all');
   const [selectedBlogId, setSelectedBlogId] = useState<number | undefined>();
 
@@ -102,6 +104,34 @@ export default function App() {
             exit={{ opacity: 0, x: -20 }}
           >
             <Settings onBack={() => setView('dashboard')} />
+          </motion.div>
+        )}
+
+        {view === 'privacy' && (
+          <motion.div
+            key="privacy"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+          >
+            <PrivacySettings onBack={() => setView('dashboard')} />
+          </motion.div>
+        )}
+
+        {view === 'admin' && (
+          <motion.div
+            key="admin"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+          >
+            <AdminPanel 
+              onBack={() => setView('dashboard')} 
+              onSelectBlog={(id) => {
+                setSelectedBlogId(id);
+                setView('view');
+              }}
+            />
           </motion.div>
         )}
       </AnimatePresence>

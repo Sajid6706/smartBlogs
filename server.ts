@@ -3,9 +3,38 @@ import { createServer as createViteServer } from "vite";
 import Database from "better-sqlite3";
 import path from "path";
 import { fileURLToPath } from "url";
+import fs from "fs";
+import dotenv from "dotenv";
+import multer from "multer";
+
+dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Ensure upload directory exists
+const uploadDir = path.join(__dirname, "public/uploads");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
 const db = new Database("smartblog.db");
+
+// Configure Multer for local storage
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(__dirname, "public/uploads"));
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname));
+  },
+});
+const upload = multer({ 
+  storage,
+  limits: {
+    fileSize: 50 * 1024 * 1024 // 50MB limit
+  }
+});
 
 // Initialize Database
 db.exec(`
@@ -78,6 +107,13 @@ try {
   db.prepare("ALTER TABLE users ADD COLUMN password TEXT").run();
 } catch (e) {}
 
+// Migration: Add role column if it doesn't exist
+try {
+  db.prepare("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'").run();
+  // Set default admin
+  db.prepare("UPDATE users SET role = 'admin' WHERE email = 'sajidahmad1001@gmail.com'").run();
+} catch (e) {}
+
 // Migration: Add visibility column if it doesn't exist
 try {
   db.prepare("ALTER TABLE blogs ADD COLUMN visibility TEXT DEFAULT 'public'").run();
@@ -88,11 +124,35 @@ try {
   db.prepare("ALTER TABLE blogs ADD COLUMN image_url TEXT").run();
 } catch (e) {}
 
+// Migration: Add media_url and media_type columns
+try {
+  db.prepare("ALTER TABLE blogs ADD COLUMN media_url TEXT").run();
+} catch (e) {}
+try {
+  db.prepare("ALTER TABLE blogs ADD COLUMN media_type TEXT DEFAULT 'image'").run();
+} catch (e) {}
+
+// Migration: Add bio and photo_url to users
+try {
+  db.prepare("ALTER TABLE users ADD COLUMN bio TEXT").run();
+} catch (e) {}
+try {
+  db.prepare("ALTER TABLE users ADD COLUMN photo_url TEXT").run();
+} catch (e) {}
+
 async function startServer() {
   const app = express();
   app.use(express.json());
+  
+  // Serve static files from public/uploads
+  app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));
 
   // API Routes
+  app.post("/api/upload", upload.single("file"), (req: any, res) => {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    const fileUrl = `/uploads/${req.file.filename}`;
+    res.json({ url: fileUrl });
+  });
   app.post("/api/auth/login", (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) {
@@ -131,8 +191,8 @@ async function startServer() {
       if (existing) {
         return res.status(400).json({ error: "Email already registered. Please login." });
       }
-      const result = db.prepare("INSERT INTO users (email, username, password) VALUES (?, ?, ?)").run(email.trim(), username.trim(), password);
-      const user = { id: Number(result.lastInsertRowid), email: email.trim(), username: username.trim() };
+      const result = db.prepare("INSERT INTO users (email, username, password, role) VALUES (?, ?, ?, ?)").run(email.trim(), username.trim(), password, 'user');
+      const user = { id: Number(result.lastInsertRowid), email: email.trim(), username: username.trim(), role: 'user' };
       res.json(user);
     } catch (error) {
       console.error("Registration Error:", error);
@@ -155,10 +215,72 @@ async function startServer() {
     }
   });
 
+  app.get("/api/admin/blogs", (req, res) => {
+    const { userId } = req.query;
+    if (!userId) return res.status(400).json({ error: "User ID required" });
+    
+    const user = db.prepare("SELECT role FROM users WHERE id = ?").get(userId) as any;
+    if (!user || user.role !== 'admin') {
+      return res.status(403).json({ error: "Unauthorized. Admin access required." });
+    }
+
+    const blogs = db.prepare(`
+      SELECT b.*, u.username as author_name,
+      (SELECT COUNT(*) FROM reactions r WHERE r.blog_id = b.id) as reaction_count
+      FROM blogs b
+      JOIN users u ON b.author_id = u.id
+      ORDER BY b.created_at DESC
+    `).all();
+    res.json(blogs);
+  });
+
+  app.patch("/api/admin/blogs/:id", (req, res) => {
+    const { userId, visibility, status } = req.body;
+    if (!userId) return res.status(400).json({ error: "User ID required" });
+
+    const user = db.prepare("SELECT role FROM users WHERE id = ?").get(userId) as any;
+    if (!user || user.role !== 'admin') {
+      return res.status(403).json({ error: "Unauthorized. Admin access required." });
+    }
+
+    try {
+      if (visibility) {
+        db.prepare("UPDATE blogs SET visibility = ? WHERE id = ?").run(visibility, req.params.id);
+      }
+      if (status) {
+        db.prepare("UPDATE blogs SET status = ? WHERE id = ?").run(status, req.params.id);
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update blog" });
+    }
+  });
+
+  app.delete("/api/admin/blogs/:id", (req, res) => {
+    const { userId } = req.query;
+    if (!userId) return res.status(400).json({ error: "User ID required" });
+
+    const user = db.prepare("SELECT role FROM users WHERE id = ?").get(userId) as any;
+    if (!user || user.role !== 'admin') {
+      return res.status(403).json({ error: "Unauthorized. Admin access required." });
+    }
+
+    try {
+      db.prepare("DELETE FROM blog_tags WHERE blog_id = ?").run(req.params.id);
+      db.prepare("DELETE FROM blog_versions WHERE blog_id = ?").run(req.params.id);
+      db.prepare("DELETE FROM reactions WHERE blog_id = ?").run(req.params.id);
+      db.prepare("DELETE FROM comments WHERE blog_id = ?").run(req.params.id);
+      db.prepare("DELETE FROM blogs WHERE id = ?").run(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete blog" });
+    }
+  });
+
   app.get("/api/blogs", (req, res) => {
     const userId = req.query.user_id;
     const blogs = db.prepare(`
-      SELECT b.*, u.username as author_name,
+      SELECT b.*, u.username as author_name, u.bio as author_bio, u.photo_url as author_photo,
       (SELECT COUNT(*) FROM reactions r WHERE r.blog_id = b.id) as reaction_count
       FROM blogs b
       JOIN users u ON b.author_id = u.id
@@ -170,7 +292,7 @@ async function startServer() {
 
   app.get("/api/blogs/:id", (req, res) => {
     const blog = db.prepare(`
-      SELECT b.*, u.username as author_name
+      SELECT b.*, u.username as author_name, u.bio as author_bio, u.photo_url as author_photo
       FROM blogs b
       JOIN users u ON b.author_id = u.id
       WHERE b.id = ?
@@ -197,8 +319,8 @@ async function startServer() {
   });
 
   app.post("/api/blogs", (req, res) => {
-    const { author_id, title, content, tags, visibility, image_url } = req.body;
-    const result = db.prepare("INSERT INTO blogs (author_id, title, content, visibility, image_url) VALUES (?, ?, ?, ?, ?)").run(author_id, title, content, visibility || 'public', image_url || null);
+    const { author_id, title, content, tags, visibility, media_url, media_type } = req.body;
+    const result = db.prepare("INSERT INTO blogs (author_id, title, content, visibility, media_url, media_type) VALUES (?, ?, ?, ?, ?, ?)").run(author_id, title, content, visibility || 'public', media_url || null, media_type || 'image');
     const blogId = result.lastInsertRowid;
 
     if (tags && Array.isArray(tags)) {
@@ -215,15 +337,15 @@ async function startServer() {
   });
 
   app.put("/api/blogs/:id", (req, res) => {
-    const { title, content, tags, visibility, image_url } = req.body;
+    const { title, content, tags, visibility, media_url, media_type } = req.body;
     const oldBlog = db.prepare("SELECT content FROM blogs WHERE id = ?").get(req.params.id) as any;
     
     if (oldBlog) {
       db.prepare("INSERT INTO blog_versions (blog_id, content) VALUES (?, ?)").run(req.params.id, oldBlog.content);
     }
 
-    db.prepare("UPDATE blogs SET title = ?, content = ?, visibility = ?, image_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-      .run(title, content, visibility || 'public', image_url || null, req.params.id);
+    db.prepare("UPDATE blogs SET title = ?, content = ?, visibility = ?, media_url = ?, media_type = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+      .run(title, content, visibility || 'public', media_url || null, media_type || 'image', req.params.id);
 
     if (tags && Array.isArray(tags)) {
       db.prepare("DELETE FROM blog_tags WHERE blog_id = ?").run(req.params.id);
@@ -241,21 +363,28 @@ async function startServer() {
 
   app.put("/api/users/:id", (req, res) => {
     const { id } = req.params;
-    const { username, email, password, newPassword } = req.body;
+    const { username, email, password, newPassword, bio, photo_url } = req.body;
 
     try {
       // Verify current password
-      const user = db.prepare("SELECT * FROM users WHERE id = ?").get(id);
+      const user = db.prepare("SELECT * FROM users WHERE id = ?").get(id) as any;
       if (!user || user.password !== password) {
         return res.status(401).json({ error: "Invalid current password" });
       }
 
       // Update user
       const finalPassword = newPassword || password;
-      db.prepare("UPDATE users SET username = ?, email = ?, password = ? WHERE id = ?")
-        .run(username.trim(), email.trim(), finalPassword, id);
+      db.prepare("UPDATE users SET username = ?, email = ?, password = ?, bio = ?, photo_url = ? WHERE id = ?")
+        .run(username.trim(), email.trim(), finalPassword, bio || null, photo_url || null, id);
 
-      const updatedUser = { id: Number(id), username: username.trim(), email: email.trim() };
+      const updatedUser = { 
+        id: Number(id), 
+        username: username.trim(), 
+        email: email.trim(),
+        bio,
+        photo_url,
+        role: user.role
+      };
       res.json(updatedUser);
     } catch (error) {
       console.error("Update User Error:", error);
@@ -355,9 +484,10 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    app.use(express.static(path.join(__dirname, "dist")));
+    const distPath = path.join(__dirname, "dist");
+    app.use(express.static(distPath));
     app.get("*", (req, res) => {
-      res.sendFile(path.join(__dirname, "dist", "index.html"));
+      res.sendFile(path.join(distPath, "index.html"));
     });
   }
 

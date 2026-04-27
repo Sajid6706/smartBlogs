@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { formatDistanceToNow } from 'date-fns';
+import { apiFetch } from '../lib/api';
 
 export const Dashboard = ({ view, onViewChange, onSelectBlog, onCreateBlog, onEditBlog }: { view: 'all' | 'my', onViewChange: (v: 'all' | 'my') => void, onSelectBlog: (id: number) => void, onCreateBlog: () => void, onEditBlog: (id: number) => void }) => {
   const [blogs, setBlogs] = useState<any[]>([]);
@@ -25,8 +26,8 @@ export const Dashboard = ({ view, onViewChange, onSelectBlog, onCreateBlog, onEd
     setLoading(true);
     try {
       const [blogsRes, statsRes] = await Promise.all([
-        fetch(`/api/blogs?user_id=${user?.id}`),
-        fetch('/api/stats')
+        apiFetch(`/api/blogs?user_id=${user?.id}`),
+        apiFetch('/api/stats')
       ]);
       const allBlogs = await blogsRes.json();
       setBlogs(allBlogs);
@@ -48,7 +49,7 @@ export const Dashboard = ({ view, onViewChange, onSelectBlog, onCreateBlog, onEd
     console.log("Attempting to delete blog:", id);
     // Removed confirm to fix potential browser dialog issues in preview
     try {
-      const res = await fetch(`/api/blogs/${id}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/blogs/${id}`, { method: 'DELETE' });
       if (res.ok) {
         console.log("Delete successful for blog:", id);
         setBlogs(prev => prev.filter(b => b.id !== id));
@@ -69,12 +70,10 @@ export const Dashboard = ({ view, onViewChange, onSelectBlog, onCreateBlog, onEd
 
   const cardClasses = theme === 'orange' 
     ? 'bg-zinc-900/50 border-orange-500/20 hover:border-orange-500/40' 
-    : theme === 'dark' 
-      ? 'bg-slate-800/50 border-slate-700/50 backdrop-blur-xl hover:border-slate-600' 
-      : 'bg-white/80 border-slate-200 backdrop-blur-xl hover:border-indigo-200';
+    : 'bg-white/80 border-slate-200 backdrop-blur-xl hover:border-indigo-200';
 
   return (
-    <div className={`max-w-7xl mx-auto px-6 py-12 ${theme === 'orange' ? 'text-[#ff8c00]' : theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+    <div className={`max-w-7xl mx-auto px-6 py-12 ${theme === 'orange' ? 'text-[#ff8c00]' : 'text-slate-900'}`}>
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
         {/* Main Content */}
         <div className="lg:col-span-8 space-y-8">
@@ -98,14 +97,32 @@ export const Dashboard = ({ view, onViewChange, onSelectBlog, onCreateBlog, onEd
                 className={`rounded-3xl border shadow-sm hover:shadow-xl transition-all cursor-pointer group overflow-hidden ${cardClasses}`}
                 onClick={() => onSelectBlog(blog.id)}
               >
-                {blog.image_url && (
-                  <div className="w-full h-64 overflow-hidden">
-                    <img 
-                      src={blog.image_url} 
-                      alt={blog.title} 
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      referrerPolicy="no-referrer"
-                    />
+                {(blog.media_url || blog.image_url) && (
+                  <div className="w-full h-64 overflow-hidden bg-black/5 relative">
+                    {blog.media_type === 'video' ? (
+                      <video 
+                        src={blog.media_url} 
+                        autoPlay 
+                        muted 
+                        loop 
+                        playsInline
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                    ) : blog.media_type === 'audio' ? (
+                      <div className={`w-full h-full flex flex-col items-center justify-center gap-4 ${theme === 'orange' ? 'bg-orange-500/10' : 'bg-slate-100'}`}>
+                        <div className={`w-16 h-16 rounded-full flex items-center justify-center ${theme === 'orange' ? 'bg-orange-500/20 text-orange-500' : 'bg-indigo-200 text-indigo-600'}`}>
+                          <Zap className="w-8 h-8" />
+                        </div>
+                        <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Audio Content</p>
+                      </div>
+                    ) : (
+                      <img 
+                        src={blog.media_url || blog.image_url} 
+                        alt={blog.title} 
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        referrerPolicy="no-referrer"
+                      />
+                    )}
                   </div>
                 )}
                 <div className="p-6">
@@ -125,8 +142,8 @@ export const Dashboard = ({ view, onViewChange, onSelectBlog, onCreateBlog, onEd
                       <span className="flex items-center gap-1"><Heart className="w-4 h-4" /> {blog.reaction_count}</span>
                     </div>
                   </div>
-                  <h3 className={`text-2xl font-black mb-3 transition-colors ${theme === 'orange' ? 'text-orange-100 group-hover:text-orange-500' : theme === 'dark' ? 'text-white group-hover:text-indigo-400' : 'group-hover:text-indigo-600'}`}>{blog.title}</h3>
-                  <p className={`line-clamp-2 mb-6 leading-relaxed ${theme === 'orange' ? 'text-orange-500/60' : theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                  <h3 className={`text-2xl font-black mb-3 transition-colors ${theme === 'orange' ? 'text-orange-100 group-hover:text-orange-500' : 'group-hover:text-indigo-600'}`}>{blog.title}</h3>
+                  <p className={`line-clamp-2 mb-6 leading-relaxed ${theme === 'orange' ? 'text-orange-500/60' : 'text-slate-600'}`}>
                     {blog.content.replace(/[#*`]/g, '')}
                   </p>
                   <div className={`flex items-center justify-between pt-6 border-t ${theme === 'orange' ? 'border-orange-500/10' : 'border-slate-50'}`}>
@@ -135,7 +152,7 @@ export const Dashboard = ({ view, onViewChange, onSelectBlog, onCreateBlog, onEd
                         {blog.author_name[0].toUpperCase()}
                       </div>
                       <div>
-                        <p className={`text-sm font-bold ${theme === 'orange' ? 'text-orange-100' : theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>@{blog.author_name}</p>
+                        <p className={`text-sm font-bold ${theme === 'orange' ? 'text-orange-100' : 'text-slate-900'}`}>@{blog.author_name}</p>
                         <p className="text-xs text-slate-400">Author</p>
                       </div>
                     </div>
@@ -186,7 +203,7 @@ export const Dashboard = ({ view, onViewChange, onSelectBlog, onCreateBlog, onEd
           </section>
 
           {/* Top Writers */}
-          <section className={`p-8 rounded-3xl shadow-xl ${theme === 'orange' ? 'bg-zinc-950 border border-orange-500/20' : 'bg-slate-900 text-white'}`}>
+          <section className={`p-8 rounded-3xl shadow-xl ${theme === 'orange' ? 'bg-zinc-950 border border-orange-500/20' : 'bg-white text-slate-900 border border-slate-200'}`}>
             <h3 className="text-xl font-bold mb-6 flex items-center gap-2 uppercase tracking-tight italic">
               <Users className="text-indigo-400" /> Top Writers
             </h3>

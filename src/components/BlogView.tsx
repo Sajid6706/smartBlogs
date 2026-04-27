@@ -12,11 +12,13 @@ import {
   Heart,
   Smile,
   Lightbulb,
-  Info
+  Info,
+  Zap
 } from 'lucide-react';
 import Markdown from 'react-markdown';
 import { motion } from 'motion/react';
 import { format } from 'date-fns';
+import { apiFetch } from '../lib/api';
 
 const REACTION_TYPES = [
   { type: 'inspiring', icon: Lightbulb, label: 'Inspiring', color: 'text-amber-500 bg-amber-50' },
@@ -34,7 +36,7 @@ export const BlogView = ({ blogId, onBack }: { blogId: number, onBack: () => voi
 
   const fetchBlog = async () => {
     try {
-      const res = await fetch(`/api/blogs/${blogId}`);
+      const res = await apiFetch(`/api/blogs/${blogId}`);
       const data = await res.json();
       setBlog(data);
     } catch (error) {
@@ -51,9 +53,8 @@ export const BlogView = ({ blogId, onBack }: { blogId: number, onBack: () => voi
   const handleReaction = async (type: string) => {
     if (!user) return;
     try {
-      await fetch(`/api/blogs/${blogId}/reactions`, {
+      await apiFetch(`/api/blogs/${blogId}/reactions`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: user.id, type }),
       });
       fetchBlog();
@@ -68,9 +69,8 @@ export const BlogView = ({ blogId, onBack }: { blogId: number, onBack: () => voi
     setSubmitting(true);
     try {
       // AI Filtering
-      const filterRes = await fetch('/api/ai/filter-comment', {
+      const filterRes = await apiFetch('/api/ai/filter-comment', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ comment }),
       });
       const { is_spam } = await filterRes.json();
@@ -79,9 +79,8 @@ export const BlogView = ({ blogId, onBack }: { blogId: number, onBack: () => voi
         alert("Your comment was flagged as inappropriate and will not be visible.");
       }
 
-      await fetch(`/api/blogs/${blogId}/comments`, {
+      await apiFetch(`/api/blogs/${blogId}/comments`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: user.id, content: comment, is_spam }),
       });
       setComment('');
@@ -100,28 +99,42 @@ export const BlogView = ({ blogId, onBack }: { blogId: number, onBack: () => voi
 
   const cardClasses = theme === 'orange' 
     ? 'bg-zinc-900/50 border-orange-500/10' 
-    : theme === 'dark' 
-      ? 'bg-slate-800/50 border-slate-700/50 backdrop-blur-xl' 
-      : 'bg-slate-50 border-transparent backdrop-blur-xl';
+    : 'bg-slate-50 border-transparent backdrop-blur-xl';
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-12">
       <button 
         onClick={onBack} 
-        className={`mb-8 p-3 rounded-2xl transition-all border ${theme === 'orange' ? 'border-orange-500/20 hover:bg-orange-500/10 text-orange-500' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800 text-slate-400' : 'border-slate-200 hover:bg-slate-100 text-slate-600'}`}
+        className={`mb-8 p-3 rounded-2xl transition-all border ${theme === 'orange' ? 'border-orange-500/20 hover:bg-orange-500/10 text-orange-500' : 'border-slate-200 hover:bg-slate-100 text-slate-600'}`}
       >
         <ArrowLeft className="w-6 h-6" />
       </button>
 
       <article>
-        {blog.image_url && (
-          <div className="w-full h-[400px] rounded-[2.5rem] overflow-hidden mb-12 shadow-2xl border border-white/10">
-            <img 
-              src={blog.image_url} 
-              alt={blog.title} 
-              className="w-full h-full object-cover"
-              referrerPolicy="no-referrer"
-            />
+        {(blog.media_url || blog.image_url) && (
+          <div className="w-full min-h-[400px] rounded-[2.5rem] overflow-hidden mb-12 shadow-2xl border border-white/10 relative">
+            {blog.media_type === 'video' ? (
+              <video 
+                src={blog.media_url} 
+                controls 
+                className="w-full h-full min-h-[400px] object-cover"
+              />
+            ) : blog.media_type === 'audio' ? (
+              <div className={`w-full min-h-[400px] flex flex-col items-center justify-center gap-6 ${theme === 'orange' ? 'bg-orange-500/10' : 'bg-slate-100'}`}>
+                <div className={`w-24 h-24 rounded-full flex items-center justify-center animate-pulse ${theme === 'orange' ? 'bg-orange-500/20 text-orange-500' : 'bg-indigo-200 text-indigo-600'}`}>
+                  <Zap className="w-12 h-12" />
+                </div>
+                <audio src={blog.media_url} controls className="w-64" />
+                <p className="text-xs font-black uppercase tracking-widest opacity-40">Audio Content</p>
+              </div>
+            ) : (
+              <img 
+                src={blog.media_url || blog.image_url} 
+                alt={blog.title} 
+                className="w-full h-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+            )}
           </div>
         )}
 
@@ -137,12 +150,21 @@ export const BlogView = ({ blogId, onBack }: { blogId: number, onBack: () => voi
 
         <div className={`flex items-center justify-between py-8 border-y mb-12 ${theme === 'orange' ? 'border-orange-500/10' : 'border-slate-100'}`}>
           <div className="flex items-center gap-4">
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl ${theme === 'orange' ? 'bg-orange-500/10 text-orange-500' : 'bg-indigo-600 text-white'}`}>
-              {blog.author_name[0].toUpperCase()}
+            <div className={`w-14 h-14 rounded-full overflow-hidden flex items-center justify-center font-bold text-xl ${theme === 'orange' ? 'bg-orange-500/10 text-orange-500' : 'bg-indigo-600 text-white'}`}>
+              {blog.author_photo ? (
+                <img src={blog.author_photo} alt={blog.author_name} className="w-full h-full object-cover" />
+              ) : (
+                blog.author_name[0].toUpperCase()
+              )}
             </div>
             <div>
-              <p className="font-bold">@{blog.author_name}</p>
-              <p className={`text-sm flex items-center gap-1 ${theme === 'orange' ? 'text-orange-500/40' : 'text-slate-400'}`}>
+              <p className="font-black text-lg leading-tight">@{blog.author_name}</p>
+              {blog.author_bio && (
+                <p className={`text-xs mt-1 max-w-sm line-clamp-2 ${theme === 'orange' ? 'text-orange-500/60' : 'text-slate-500'}`}>
+                  {blog.author_bio}
+                </p>
+              )}
+              <p className={`text-[10px] mt-2 flex items-center gap-1 font-black uppercase tracking-widest ${theme === 'orange' ? 'text-orange-500/40' : 'text-slate-400'}`}>
                 <Calendar className="w-3 h-3" /> {format(new Date(blog.created_at), 'MMM d, yyyy')}
               </p>
             </div>
@@ -152,7 +174,7 @@ export const BlogView = ({ blogId, onBack }: { blogId: number, onBack: () => voi
           </div>
         </div>
 
-        <div className={`markdown-body mb-20 prose prose-lg max-w-none ${theme === 'orange' ? 'prose-invert prose-orange' : theme === 'dark' ? 'prose-invert' : ''}`}>
+        <div className={`markdown-body mb-20 prose prose-lg max-w-none ${theme === 'orange' ? 'prose-invert prose-orange' : ''}`}>
           <Markdown>{blog.content}</Markdown>
         </div>
 
@@ -191,7 +213,7 @@ export const BlogView = ({ blogId, onBack }: { blogId: number, onBack: () => voi
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               placeholder={isAuthor ? "Add a thought to your story..." : "Reply to this story..."}
-              className={`w-full p-8 rounded-[2.5rem] border focus:ring-2 outline-none transition-all min-h-[160px] resize-none text-lg ${theme === 'orange' ? 'bg-black border-orange-500/20 focus:ring-orange-500' : theme === 'dark' ? 'bg-slate-800/50 border-slate-700 focus:ring-indigo-500' : 'bg-white/80 border-slate-200 focus:ring-indigo-500'}`}
+              className={`w-full p-8 rounded-[2.5rem] border focus:ring-2 outline-none transition-all min-h-[160px] resize-none text-lg ${theme === 'orange' ? 'bg-black border-orange-500/20 focus:ring-orange-500' : 'bg-white/80 border-slate-200 focus:ring-indigo-500'}`}
             />
             <button
               disabled={submitting || !comment}

@@ -11,18 +11,23 @@ import {
   Plus,
   ArrowRight,
   Globe,
-  Lock
+  Lock,
+  Upload,
+  Zap
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { apiFetch } from '../lib/api';
 
 export const BlogEditor = ({ blogId, onBack }: { blogId?: number, onBack: () => void }) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
+  const [mediaUrl, setMediaUrl] = useState('');
+  const [mediaType, setMediaType] = useState<'image' | 'video' | 'audio'>('image');
   const [tags, setTags] = useState<string[]>([]);
   const [visibility, setVisibility] = useState<'public' | 'private'>('public');
   const [newTag, setNewTag] = useState('');
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
@@ -30,29 +35,65 @@ export const BlogEditor = ({ blogId, onBack }: { blogId?: number, onBack: () => 
 
   useEffect(() => {
     if (blogId) {
-      fetch(`/api/blogs/${blogId}`)
+      apiFetch(`/api/blogs/${blogId}`)
         .then(res => res.json())
         .then(data => {
           setTitle(data.title);
           setContent(data.content);
-          setImageUrl(data.image_url || '');
+          setMediaUrl(data.media_url || data.image_url || '');
+          setMediaType(data.media_type || 'image');
           setTags(data.tags.map((t: any) => t.name));
           setVisibility(data.visibility || 'public');
         });
       
-      fetch(`/api/blogs/${blogId}/versions`)
+      apiFetch(`/api/blogs/${blogId}/versions`)
         .then(res => res.json())
         .then(data => setHistory(data));
     }
   }, [blogId]);
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Determine type from file
+    if (file.type.startsWith('image/')) setMediaType('image');
+    else if (file.type.startsWith('video/')) setMediaType('video');
+    else if (file.type.startsWith('audio/')) setMediaType('audio');
+
+    // Local preview logic
+    if (file.type.startsWith('image/') || file.type.startsWith('video/') || file.type.startsWith('audio/')) {
+       const localUrl = URL.createObjectURL(file);
+       setMediaUrl(localUrl);
+    }
+
+    setUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.url) {
+        setMediaUrl(data.url);
+      }
+    } catch (error) {
+      console.error("Upload Error:", error);
+      // Revert if possible or show error
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleSuggestTags = async () => {
     if (!title || !content) return;
     setSuggesting(true);
     try {
-      const res = await fetch('/api/ai/suggest-tags', {
+      const res = await apiFetch('/api/ai/suggest-tags', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title, content }),
       });
       const suggested = await res.json();
@@ -69,16 +110,17 @@ export const BlogEditor = ({ blogId, onBack }: { blogId?: number, onBack: () => 
     try {
       const method = blogId ? 'PUT' : 'POST';
       const url = blogId ? `/api/blogs/${blogId}` : '/api/blogs';
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           author_id: user?.id,
           title,
           content,
           tags,
           visibility,
-          image_url: imageUrl
+          media_url: mediaUrl,
+          media_type: mediaType,
+          image_url: mediaType === 'image' ? mediaUrl : null
         }),
       });
       if (res.ok) onBack();
@@ -103,16 +145,14 @@ export const BlogEditor = ({ blogId, onBack }: { blogId?: number, onBack: () => 
 
   const inputClasses = theme === 'orange' 
     ? 'bg-black border-orange-500/20 focus:ring-orange-500 text-orange-100' 
-    : theme === 'dark' 
-      ? 'bg-slate-800/50 border-slate-700 focus:ring-indigo-500 text-white' 
-      : 'bg-slate-50 border-slate-100 focus:ring-indigo-500 text-slate-900';
+    : 'bg-slate-50 border-slate-100 focus:ring-indigo-500 text-slate-900';
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-12">
       <div className="flex items-center justify-between mb-12">
         <button 
           onClick={onBack} 
-          className={`p-3 rounded-2xl transition-all border ${theme === 'orange' ? 'border-orange-500/20 hover:bg-orange-500/10 text-orange-500' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800 text-slate-400' : 'border-slate-200 hover:bg-slate-100 text-slate-600'}`}
+          className={`p-3 rounded-2xl transition-all border ${theme === 'orange' ? 'border-orange-500/20 hover:bg-orange-500/10 text-orange-500' : 'border-slate-200 hover:bg-slate-100 text-slate-600'}`}
         >
           <ArrowLeft className="w-6 h-6" />
         </button>
@@ -120,7 +160,7 @@ export const BlogEditor = ({ blogId, onBack }: { blogId?: number, onBack: () => 
           <select 
             value={visibility}
             onChange={(e) => setVisibility(e.target.value as 'public' | 'private')}
-            className={`px-6 py-3 rounded-2xl font-black uppercase tracking-widest outline-none border transition-all cursor-pointer ${theme === 'orange' ? 'bg-black border-orange-500/20 text-orange-500 hover:bg-orange-500/5' : theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white hover:bg-slate-700' : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200'}`}
+            className={`px-6 py-3 rounded-2xl font-black uppercase tracking-widest outline-none border transition-all cursor-pointer ${theme === 'orange' ? 'bg-black border-orange-500/20 text-orange-500 hover:bg-orange-500/5' : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200'}`}
           >
             <option value="public">🌍 Public</option>
             <option value="private">🔒 Private</option>
@@ -128,7 +168,7 @@ export const BlogEditor = ({ blogId, onBack }: { blogId?: number, onBack: () => 
           {blogId && (
             <button 
               onClick={() => setShowHistory(!showHistory)}
-              className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-black uppercase tracking-widest transition-all border ${theme === 'orange' ? 'border-orange-500/20 text-orange-500 hover:bg-orange-500/5' : theme === 'dark' ? 'border-slate-700 text-slate-400 hover:bg-slate-800' : 'border-slate-200 text-slate-600 hover:bg-slate-100'}`}
+              className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-black uppercase tracking-widest transition-all border ${theme === 'orange' ? 'border-orange-500/20 text-orange-500 hover:bg-orange-500/5' : 'border-slate-200 text-slate-600 hover:bg-slate-100'}`}
             >
               <History className="w-5 h-5" /> History
             </button>
@@ -150,19 +190,74 @@ export const BlogEditor = ({ blogId, onBack }: { blogId?: number, onBack: () => 
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Enter a catchy title..."
-          className={`w-full text-5xl font-black placeholder:opacity-20 outline-none border-none bg-transparent italic uppercase tracking-tighter ${theme === 'orange' ? 'text-orange-100' : theme === 'dark' ? 'text-white' : 'text-slate-900'}`}
+          className={`w-full text-5xl font-black placeholder:opacity-20 outline-none border-none bg-transparent italic uppercase tracking-tighter ${theme === 'orange' ? 'text-orange-100' : 'text-slate-900'}`}
         />
 
-        <div className="space-y-3">
-          <label className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40 ml-1">Cover Image URL</label>
-          <input
-            type="text"
-            value={imageUrl}
-            onChange={(e) => setImageUrl(e.target.value)}
-            placeholder="https://images.unsplash.com/..."
-            className={`w-full p-5 rounded-2xl outline-none border transition-all text-sm font-medium ${inputClasses}`}
-          />
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+          <div className="md:col-span-3 space-y-3">
+            <label className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40 ml-1">Media Type</label>
+            <select
+              value={mediaType}
+              onChange={(e) => setMediaType(e.target.value as any)}
+              className={`w-full p-5 rounded-2xl outline-none border transition-all text-sm font-bold uppercase tracking-widest cursor-pointer ${inputClasses}`}
+            >
+              <option value="image">🖼️ Image</option>
+              <option value="video">📽️ Video</option>
+              <option value="audio">🎵 Audio</option>
+            </select>
+          </div>
+          <div className="md:col-span-9 space-y-3">
+            <label className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40 ml-1">Media SOURCE (Link or Upload)</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={mediaUrl}
+                onChange={(e) => setMediaUrl(e.target.value)}
+                placeholder="Paste your media link here..."
+                className={`flex-grow p-5 rounded-2xl outline-none border transition-all text-sm font-medium ${inputClasses}`}
+              />
+              <label className={`cursor-pointer p-5 rounded-2xl border transition-all flex items-center justify-center min-w-[64px] ${theme === 'orange' ? 'border-orange-500/20 hover:bg-orange-500/10 text-orange-500' : 'border-slate-200 hover:bg-slate-100 text-slate-600'}`}>
+                {uploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
+                <input type="file" className="hidden" onChange={handleFileUpload} accept="image/*,video/*,audio/*" />
+              </label>
+            </div>
+          </div>
         </div>
+
+        {/* Media Preview */}
+        {mediaUrl && (
+          <div className={`w-full rounded-[2rem] overflow-hidden border relative group shadow-lg ${theme === 'orange' ? 'border-orange-500/20' : 'border-slate-100'}`}>
+            <div className="absolute top-4 left-4 z-10">
+              <span className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest backdrop-blur-md border ${theme === 'orange' ? 'bg-black/60 border-orange-500/20 text-orange-500' : 'bg-white/60 border-indigo-100 text-indigo-600'}`}>
+                Preview
+              </span>
+            </div>
+            <button 
+              onClick={() => setMediaUrl('')}
+              className="absolute top-4 right-4 z-10 p-2 bg-rose-500 text-white rounded-xl opacity-0 group-hover:opacity-100 transition-opacity shadow-xl"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            {mediaType === 'video' ? (
+              <video src={mediaUrl} controls muted className="w-full h-auto max-h-[500px] object-cover" />
+            ) : mediaType === 'audio' ? (
+              <div className={`p-12 flex flex-col items-center gap-4 ${theme === 'orange' ? 'bg-orange-500/5' : 'bg-slate-50'}`}>
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center ${theme === 'orange' ? 'bg-orange-500/20 text-orange-500' : 'bg-indigo-600 text-white'}`}>
+                  <Zap className="w-8 h-8" />
+                </div>
+                <audio src={mediaUrl} controls className="w-full max-w-sm" />
+              </div>
+            ) : (
+              <img src={mediaUrl} alt="Preview" className="w-full h-auto max-h-[600px] object-cover" />
+            )}
+            {uploading && (
+              <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
+                <Loader2 className="w-12 h-12 text-white animate-spin" />
+                <p className="text-white text-xs font-black uppercase tracking-widest">Optimizing Media...</p>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className={`flex flex-wrap items-center gap-4 py-6 border-y ${theme === 'orange' ? 'border-orange-500/10' : 'border-slate-100'}`}>
           <div className="flex flex-wrap gap-2">
@@ -196,7 +291,7 @@ export const BlogEditor = ({ blogId, onBack }: { blogId?: number, onBack: () => 
           value={content}
           onChange={(e) => setContent(e.target.value)}
           placeholder="Tell your story... (Markdown supported)"
-          className={`w-full min-h-[600px] text-xl leading-relaxed placeholder:opacity-20 outline-none border-none bg-transparent resize-none font-medium ${theme === 'orange' ? 'text-orange-100/80' : theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}
+          className={`w-full min-h-[600px] text-xl leading-relaxed placeholder:opacity-20 outline-none border-none bg-transparent resize-none font-medium ${theme === 'orange' ? 'text-orange-100/80' : 'text-slate-700'}`}
         />
       </div>
 

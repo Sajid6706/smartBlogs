@@ -42,8 +42,6 @@ export const Settings = ({ onBack, onNavigateToAuth }: { onBack: () => void, onN
         body: JSON.stringify({ 
           username, 
           email, 
-          password, 
-          newPassword,
           bio,
           photo_url: photoUrl
         }),
@@ -53,8 +51,6 @@ export const Settings = ({ onBack, onNavigateToAuth }: { onBack: () => void, onN
       if (res.ok) {
         setUser(data);
         setSuccess(true);
-        setPassword('');
-        setNewPassword('');
       } else {
         setError(data.error || 'Failed to update profile');
       }
@@ -96,18 +92,22 @@ export const Settings = ({ onBack, onNavigateToAuth }: { onBack: () => void, onN
 
   const cardClasses = theme === 'orange' 
     ? 'bg-zinc-900/50 border-orange-500/20' 
-    : 'bg-white border-slate-200 backdrop-blur-xl shadow-sm';
+    : theme === 'glass'
+      ? 'glass-card'
+      : 'bg-white border-slate-200 backdrop-blur-xl shadow-sm';
 
   const inputClasses = theme === 'orange' 
     ? 'bg-black border-orange-500/20 focus:ring-orange-500 text-orange-100' 
-    : 'bg-slate-50 border-slate-200 focus:ring-indigo-500 text-slate-900';
+    : theme === 'glass'
+      ? 'bg-white/20 border-white/40 focus:ring-indigo-500 text-indigo-950 placeholder:text-indigo-400'
+      : 'bg-slate-50 border-slate-200 focus:ring-indigo-500 text-slate-900';
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-12">
       <div className="flex items-center gap-4 mb-12">
         <button 
           onClick={onBack}
-          className={`p-3 rounded-2xl transition-all border ${theme === 'orange' ? 'border-orange-500/20 hover:bg-orange-500/10 text-orange-500' : 'border-slate-200 hover:bg-slate-100 text-slate-900'}`}
+          className={`p-3 rounded-2xl transition-all border ${theme === 'orange' ? 'border-orange-500/20 hover:bg-orange-500/10 text-orange-500' : theme === 'glass' ? 'border-white/40 bg-white/20 text-indigo-600 hover:bg-white/40' : 'border-slate-200 hover:bg-slate-100 text-slate-900'}`}
         >
           <ArrowLeft className="w-6 h-6" />
         </button>
@@ -123,9 +123,9 @@ export const Settings = ({ onBack, onNavigateToAuth }: { onBack: () => void, onN
             </h2>
 
             {/* Profile Photo Section */}
-            <div className="flex flex-col md:flex-row items-center gap-8 mb-10 pb-10 border-b border-indigo-500/10">
+            <div className={`flex flex-col md:flex-row items-center gap-8 mb-10 pb-10 border-b ${theme === 'glass' ? 'border-indigo-500/10' : 'border-indigo-500/10'}`}>
               <div className="relative group">
-                <div className={`w-32 h-32 rounded-[2rem] overflow-hidden border-4 transition-all relative ${theme === 'orange' ? 'border-orange-500/20 group-hover:border-orange-500' : 'border-slate-100 group-hover:border-indigo-600'}`}>
+                <div className={`w-32 h-32 rounded-[2rem] overflow-hidden border-4 transition-all relative ${theme === 'orange' ? 'border-orange-500/20 group-hover:border-orange-500' : theme === 'glass' ? 'border-white/40 group-hover:border-white' : 'border-slate-100 group-hover:border-indigo-600'}`}>
                   {photoUrl ? (
                     <img 
                       src={photoUrl} 
@@ -152,7 +152,7 @@ export const Settings = ({ onBack, onNavigateToAuth }: { onBack: () => void, onN
                 <h3 className="text-2xl font-black uppercase tracking-tight mb-2 italic">{username}</h3>
                 <p className="text-xs font-black uppercase tracking-widest opacity-40 mb-4">{user?.role} Account</p>
                 <div className="flex gap-2 justify-center md:justify-start">
-                  <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${theme === 'orange' ? 'bg-orange-500/10 text-orange-500' : 'bg-indigo-50 text-indigo-600'}`}>
+                  <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${theme === 'orange' ? 'bg-orange-500/10 text-orange-500' : theme === 'glass' ? 'bg-white/20 text-indigo-600 border border-white/40' : 'bg-indigo-50 text-indigo-600'}`}>
                     ID: #{user?.id}
                   </span>
                 </div>
@@ -201,32 +201,6 @@ export const Settings = ({ onBack, onNavigateToAuth }: { onBack: () => void, onN
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-indigo-500/5">
-                <h3 className="text-xs font-black uppercase tracking-widest mb-4 opacity-60 italic">Security Upgrade</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40 ml-1">Current Password</label>
-                    <input
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Verify identity"
-                      className={`w-full px-4 py-4 rounded-2xl outline-none border transition-all font-medium ${inputClasses}`}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40 ml-1">New Password</label>
-                    <input
-                      type="password"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="Optional update"
-                      className={`w-full px-4 py-4 rounded-2xl outline-none border transition-all font-medium ${inputClasses}`}
-                    />
-                  </div>
-                </div>
-              </div>
-
               {error && <p className="text-rose-500 text-xs font-bold">{error}</p>}
               {success && (
                 <div className="flex items-center gap-2 text-emerald-500 text-xs font-bold">
@@ -237,7 +211,7 @@ export const Settings = ({ onBack, onNavigateToAuth }: { onBack: () => void, onN
               <button
                 type="submit"
                 disabled={loading || uploading}
-                className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-xl disabled:opacity-50 ${theme === 'orange' ? 'bg-orange-500 text-black hover:bg-orange-400 shadow-orange-500/20' : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-200'}`}
+                className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-xl disabled:opacity-50 ${theme === 'orange' ? 'bg-orange-500 text-black hover:bg-orange-400 shadow-orange-500/20' : theme === 'glass' ? 'bg-indigo-600 text-white shadow-indigo-500/20' : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-200'}`}
               >
                 {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
                 Save Profile

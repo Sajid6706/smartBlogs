@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-type Theme = 'light' | 'orange';
+type Theme = 'light' | 'orange' | 'glass';
 
 interface User {
   id: number;

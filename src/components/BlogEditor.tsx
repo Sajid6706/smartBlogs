@@ -16,7 +16,7 @@ import {
   Zap
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { apiFetch } from '../lib/api';
+import { apiFetch, formatToIST } from '../lib/api';
 
 export const BlogEditor = ({ blogId, onBack }: { blogId?: number, onBack: () => void }) => {
   const [title, setTitle] = useState('');
@@ -25,6 +25,7 @@ export const BlogEditor = ({ blogId, onBack }: { blogId?: number, onBack: () => 
   const [mediaType, setMediaType] = useState<'image' | 'video' | 'audio'>('image');
   const [tags, setTags] = useState<string[]>([]);
   const [visibility, setVisibility] = useState<'public' | 'private'>('public');
+  const [status, setStatus] = useState<'published' | 'draft'>('published');
   const [newTag, setNewTag] = useState('');
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -118,6 +119,7 @@ export const BlogEditor = ({ blogId, onBack }: { blogId?: number, onBack: () => 
           content,
           tags,
           visibility,
+          status,
           media_url: mediaUrl,
           media_type: mediaType,
           image_url: mediaType === 'image' ? mediaUrl : null
@@ -164,6 +166,14 @@ export const BlogEditor = ({ blogId, onBack }: { blogId?: number, onBack: () => 
           >
             <option value="public">🌍 Public</option>
             <option value="private">🔒 Private</option>
+          </select>
+          <select 
+            value={status}
+            onChange={(e) => setStatus(e.target.value as 'published' | 'draft')}
+            className={`px-6 py-3 rounded-2xl font-black uppercase tracking-widest outline-none border transition-all cursor-pointer ${theme === 'orange' ? 'bg-black border-orange-500/20 text-orange-500 hover:bg-orange-500/5' : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200'}`}
+          >
+            <option value="published">🚀 Published</option>
+            <option value="draft">🖊️ Draft</option>
           </select>
           {blogId && (
             <button 
@@ -312,7 +322,7 @@ export const BlogEditor = ({ blogId, onBack }: { blogId?: number, onBack: () => 
               {history.map((v) => (
                 <div key={v.id} className="p-4 rounded-2xl border border-slate-100 hover:border-indigo-200 transition-all group">
                   <p className="text-xs font-bold text-slate-400 mb-2">
-                    {new Date(v.created_at).toLocaleString()}
+                    {formatToIST(v.created_at)}
                   </p>
                   <p className="text-sm text-slate-600 line-clamp-3 mb-4">{v.content}</p>
                   <button 

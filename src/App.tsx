@@ -8,13 +8,16 @@ import { Navbar } from './components/Navbar';
 import { Settings } from './components/Settings';
 import { PrivacySettings } from './components/PrivacySettings';
 import { AdminPanel } from './components/AdminPanel';
+import { UserProfile } from './components/UserProfile';
+import { SecuritySettings } from './components/SecuritySettings';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function App() {
   const { user, theme } = useStore();
-  const [view, setView] = useState<'dashboard' | 'editor' | 'view' | 'settings' | 'admin' | 'privacy'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'editor' | 'view' | 'settings' | 'admin' | 'privacy' | 'profile' | 'security'>('dashboard');
   const [subView, setSubView] = useState<'all' | 'my'>('all');
   const [selectedBlogId, setSelectedBlogId] = useState<number | undefined>();
+  const [selectedUserId, setSelectedUserId] = useState<number | undefined>();
 
   useEffect(() => {
     document.body.className = `theme-${theme}`;
@@ -24,6 +27,7 @@ export default function App() {
     switch (theme) {
       case 'orange': return 'bg-black text-[#ff8c00]';
       case 'light': return 'bg-white text-slate-900';
+      case 'glass': return 'theme-glass min-h-screen';
       default: return 'bg-white text-slate-900';
     }
   };
@@ -36,6 +40,10 @@ export default function App() {
         onViewChange={(v, sv) => {
           setView(v);
           if (sv) setSubView(sv);
+        }}
+        onViewProfile={(id) => {
+          setSelectedUserId(id);
+          setView('profile');
         }}
         currentView={view}
         currentSubView={subView}
@@ -55,6 +63,10 @@ export default function App() {
               onSelectBlog={(id) => {
                 setSelectedBlogId(id);
                 setView('view');
+              }}
+              onViewProfile={(id) => {
+                setSelectedUserId(id);
+                setView('profile');
               }}
               onCreateBlog={() => {
                 setSelectedBlogId(undefined);
@@ -92,6 +104,10 @@ export default function App() {
             <BlogView 
               blogId={selectedBlogId!}
               onBack={() => setView('dashboard')}
+              onViewProfile={(id) => {
+                setSelectedUserId(id);
+                setView('profile');
+              }}
             />
           </motion.div>
         )}
@@ -127,6 +143,35 @@ export default function App() {
           >
             <AdminPanel 
               onBack={() => setView('dashboard')} 
+              onSelectBlog={(id) => {
+                setSelectedBlogId(id);
+                setView('view');
+              }}
+            />
+          </motion.div>
+        )}
+
+        {view === 'security' && (
+          <motion.div
+            key="security"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+          >
+            <SecuritySettings onBack={() => setView('dashboard')} />
+          </motion.div>
+        )}
+
+        {view === 'profile' && (
+          <motion.div
+            key="profile"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+          >
+            <UserProfile 
+              userId={selectedUserId!}
+              onBack={() => setView('dashboard')}
               onSelectBlog={(id) => {
                 setSelectedBlogId(id);
                 setView('view');

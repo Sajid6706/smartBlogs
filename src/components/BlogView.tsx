@@ -13,11 +13,17 @@ import {
   Smile,
   Lightbulb,
   Info,
-  Zap
+  Zap,
+  Bookmark,
+  Flag,
+  Share2,
+  Edit,
+  Reply,
+  X
 } from 'lucide-react';
 import Markdown from 'react-markdown';
-import { motion } from 'motion/react';
-import { format } from 'date-fns';
+import { motion, AnimatePresence } from 'motion/react';
+import { formatToIST } from '../lib/api';
 import { apiFetch } from '../lib/api';
 
 const REACTION_TYPES = [
@@ -27,18 +33,35 @@ const REACTION_TYPES = [
   { type: 'loved_it', icon: Heart, label: 'Loved It', color: 'text-rose-500 bg-rose-50' },
 ];
 
-export const BlogView = ({ blogId, onBack }: { blogId: number, onBack: () => void }) => {
+export const BlogView = ({ 
+  blogId, 
+  onBack,
+  onViewProfile
+}: { 
+  blogId: number, 
+  onBack: () => void,
+  onViewProfile: (userId: number) => void
+}) => {
   const [blog, setBlog] = useState<any>(null);
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [replyTo, setReplyTo] = useState<any>(null);
+  const [isBookmarked, setIsBookmarked] = useState(false);
   const { user, theme } = useStore();
 
   const fetchBlog = async () => {
     try {
-      const res = await apiFetch(`/api/blogs/${blogId}`);
+      const res = await apiFetch(`/api/blogs/${blogId}${user ? `?user_id=${user.id}` : ''}`);
       const data = await res.json();
       setBlog(data);
+      
+      // Check bookmark status
+      if (user) {
+        const bmRes = await apiFetch(`/api/bookmarks?user_id=${user.id}`);
+        const bmData = await bmRes.json();
+        setIsBookmarked(bmData.some((b: any) => b.id === blogId));
+      }
     } catch (error) {
       console.error("Fetch Blog Error:", error);
     } finally {
@@ -68,27 +91,80 @@ export const BlogView = ({ blogId, onBack }: { blogId: number, onBack: () => voi
     if (!comment || !user) return;
     setSubmitting(true);
     try {
-      // AI Filtering
-      const filterRes = await apiFetch('/api/ai/filter-comment', {
-        method: 'POST',
-        body: JSON.stringify({ comment }),
-      });
-      const { is_spam } = await filterRes.json();
+      // AI Filtering (Simple check if enabled on server)
+      let is_spam = false;
+      try {
+        const filterRes = await apiFetch('/api/ai/filter-comment', {
+          method: 'POST',
+          body: JSON.stringify({ comment }),
+        });
+        if (filterRes.ok) {
+          const filterData = await filterRes.json();
+          is_spam = filterData.is_spam;
+        }
+      } catch (e) {}
 
       if (is_spam) {
-        alert("Your comment was flagged as inappropriate and will not be visible.");
+        alert("Your comment was flagged as inappropriate.");
       }
 
       await apiFetch(`/api/blogs/${blogId}/comments`, {
         method: 'POST',
-        body: JSON.stringify({ user_id: user.id, content: comment, is_spam }),
+        body: JSON.stringify({ 
+          user_id: user.id, 
+          content: comment, 
+          parent_id: replyTo?.id || null 
+        }),
       });
       setComment('');
+      setReplyTo(null);
       fetchBlog();
     } catch (error) {
       console.error("Comment Error:", error);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleBookmark = async () => {
+    if (!user) return;
+    try {
+      const res = await apiFetch(`/api/blogs/${blogId}/bookmark`, {
+        method: 'POST',
+        body: JSON.stringify({ user_id: user.id })
+      });
+      const data = await res.json();
+      setIsBookmarked(data.bookmarked);
+    } catch (error) {
+      console.error("Bookmark Error:", error);
+    }
+  };
+
+  const handleShare = () => {
+    if (navigator.share) {
+      navigator.share({
+        title: blog.title,
+        text: `Check out this blog: ${blog.title}`,
+        url: window.location.href,
+      });
+    } else {
+      navigator.clipboard.writeText(window.location.href);
+      alert("Link copied to clipboard!");
+    }
+  };
+
+  const handleReport = async () => {
+    if (!user) return;
+    const reason = prompt("Why are you reporting this post?");
+    if (!reason) return;
+    try {
+      await apiFetch('/api/reports', {
+        method: 'POST',
+        body: JSON.stringify({ reporter_id: user.id, blog_id: blogId, reason })
+      });
+      alert("Report submitted. Thank you.");
+    } catch (error) {
+      console.error("Report Error:", error);
     }
   };
 
@@ -103,12 +179,32 @@ export const BlogView = ({ blogId, onBack }: { blogId: number, onBack: () => voi
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-12">
-      <button 
-        onClick={onBack} 
-        className={`mb-8 p-3 rounded-2xl transition-all border ${theme === 'orange' ? 'border-orange-500/20 hover:bg-orange-500/10 text-orange-500' : 'border-slate-200 hover:bg-slate-100 text-slate-600'}`}
-      >
-        <ArrowLeft className="w-6 h-6" />
-      </button>
+      <div className="flex items-center justify-between mb-8">
+        <button 
+          onClick={onBack} 
+          className={`p-3 rounded-2xl transition-all border ${theme === 'orange' ? 'border-orange-500/20 hover:bg-orange-500/10 text-orange-500' : 'border-slate-200 hover:bg-slate-100 text-slate-600'}`}
+        >
+          <ArrowLeft className="w-6 h-6" />
+        </button>
+        <div className="flex gap-3">
+          <button onClick={handleShare} className={`p-3 rounded-2xl border transition-all ${theme === 'orange' ? 'border-orange-500/20 text-orange-500 hover:bg-orange-500/5' : 'border-slate-200 text-slate-400 hover:bg-slate-100'}`}>
+            <Share2 className="w-5 h-5" />
+          </button>
+          <button onClick={handleBookmark} className={`p-3 rounded-2xl border transition-all ${theme === 'orange' ? 'border-orange-500/20 text-orange-500 hover:bg-orange-500/5' : 'border-slate-200 hover:bg-slate-100'} ${isBookmarked ? 'bg-indigo-600 text-white border-indigo-600' : 'text-slate-400'}`}>
+            <Bookmark className="w-5 h-5" fill={isBookmarked ? "currentColor" : "none"} />
+          </button>
+          {isAuthor && (
+            <button className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-black uppercase tracking-widest bg-indigo-600 text-white hover:bg-indigo-700 shadow-xl shadow-indigo-200 transition-all`}>
+              <Edit className="w-4 h-4" /> Edit Post
+            </button>
+          )}
+          {!isAuthor && (
+            <button onClick={handleReport} className={`p-3 rounded-2xl border transition-all ${theme === 'orange' ? 'border-rose-500/20 text-rose-500 hover:bg-rose-500/5' : 'border-slate-200 text-slate-400 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100'}`}>
+              <Flag className="w-5 h-5" />
+            </button>
+          )}
+        </div>
+      </div>
 
       <article>
         {(blog.media_url || blog.image_url) && (
@@ -149,8 +245,11 @@ export const BlogView = ({ blogId, onBack }: { blogId: number, onBack: () => voi
         <h1 className="text-5xl lg:text-6xl font-black mb-8 leading-tight uppercase tracking-tight italic">{blog.title}</h1>
 
         <div className={`flex items-center justify-between py-8 border-y mb-12 ${theme === 'orange' ? 'border-orange-500/10' : 'border-slate-100'}`}>
-          <div className="flex items-center gap-4">
-            <div className={`w-14 h-14 rounded-full overflow-hidden flex items-center justify-center font-bold text-xl ${theme === 'orange' ? 'bg-orange-500/10 text-orange-500' : 'bg-indigo-600 text-white'}`}>
+          <div 
+            className="flex items-center gap-4 cursor-pointer group/author"
+            onClick={() => onViewProfile(blog.author_id)}
+          >
+            <div className={`w-14 h-14 rounded-full overflow-hidden flex items-center justify-center font-bold text-xl transition-transform group-hover/author:scale-110 ${theme === 'orange' ? 'bg-orange-500/10 text-orange-500' : 'bg-indigo-600 text-white'}`}>
               {blog.author_photo ? (
                 <img src={blog.author_photo} alt={blog.author_name} className="w-full h-full object-cover" />
               ) : (
@@ -158,15 +257,25 @@ export const BlogView = ({ blogId, onBack }: { blogId: number, onBack: () => voi
               )}
             </div>
             <div>
-              <p className="font-black text-lg leading-tight">@{blog.author_name}</p>
+              <div className="flex items-center gap-2">
+                <p className="font-black text-lg leading-tight group-hover/author:text-indigo-500 transition-colors">@{blog.author_name}</p>
+                <div className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest border ${theme === 'orange' ? 'bg-orange-500/10 border-orange-500/20' : 'bg-slate-100 border-slate-200'} ${blog.author_level_color}`}>
+                  {blog.author_level}
+                </div>
+              </div>
               {blog.author_bio && (
                 <p className={`text-xs mt-1 max-w-sm line-clamp-2 ${theme === 'orange' ? 'text-orange-500/60' : 'text-slate-500'}`}>
                   {blog.author_bio}
                 </p>
               )}
-              <p className={`text-[10px] mt-2 flex items-center gap-1 font-black uppercase tracking-widest ${theme === 'orange' ? 'text-orange-500/40' : 'text-slate-400'}`}>
-                <Calendar className="w-3 h-3" /> {format(new Date(blog.created_at), 'MMM d, yyyy')}
-              </p>
+              <div className="flex items-center gap-4 mt-2">
+                <p className={`text-[10px] flex items-center gap-1 font-black uppercase tracking-widest ${theme === 'orange' ? 'text-orange-500/40' : 'text-slate-400'}`}>
+                  <Calendar className="w-3 h-3" /> {formatToIST(blog.created_at)}
+                </p>
+                <p className={`text-[10px] flex items-center gap-1 font-black uppercase tracking-widest ${blog.author_uniqueness === 'High' ? 'text-amber-500' : 'opacity-40'}`}>
+                  <Zap className="w-3 h-3" /> {blog.author_uniqueness} Uniqueness
+                </p>
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -209,11 +318,24 @@ export const BlogView = ({ blogId, onBack }: { blogId: number, onBack: () => voi
           </div>
 
           <form onSubmit={handleComment} className="relative">
+            <AnimatePresence>
+              {replyTo && (
+                <motion.div 
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className={`flex items-center justify-between px-6 py-3 rounded-t-2xl border-x border-t border-inherit ${theme === 'orange' ? 'bg-orange-500/10' : 'bg-indigo-50'}`}
+                >
+                  <p className="text-xs font-bold text-indigo-600">Replying to @{replyTo.username}</p>
+                  <button onClick={() => setReplyTo(null)} className="p-1 hover:bg-indigo-100 rounded-full"><X className="w-3 h-3" /></button>
+                </motion.div>
+              )}
+            </AnimatePresence>
             <textarea
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               placeholder={isAuthor ? "Add a thought to your story..." : "Reply to this story..."}
-              className={`w-full p-8 rounded-[2.5rem] border focus:ring-2 outline-none transition-all min-h-[160px] resize-none text-lg ${theme === 'orange' ? 'bg-black border-orange-500/20 focus:ring-orange-500' : 'bg-white/80 border-slate-200 focus:ring-indigo-500'}`}
+              className={`w-full p-8 rounded-b-[2.5rem] rounded-t-none border focus:ring-2 outline-none transition-all min-h-[160px] resize-none text-lg ${replyTo ? 'border-t-0' : 'rounded-t-[2.5rem]'} ${theme === 'orange' ? 'bg-black border-orange-500/20 focus:ring-orange-500' : 'bg-white/80 border-slate-200 focus:ring-indigo-500'}`}
             />
             <button
               disabled={submitting || !comment}
@@ -225,41 +347,63 @@ export const BlogView = ({ blogId, onBack }: { blogId: number, onBack: () => voi
           </form>
 
           <div className="space-y-8">
-            {blog.comments?.map((c: any) => (
-              <motion.div 
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                key={c.id} 
-                className={`flex gap-6 p-8 rounded-[2.5rem] border shadow-sm ${cardClasses}`}
-              >
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold shrink-0 text-lg ${theme === 'orange' ? 'bg-orange-500/10 text-orange-500' : 'bg-indigo-600 text-white'}`}>
-                  {c.username[0].toUpperCase()}
-                </div>
-                <div className="flex-grow">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-3">
-                      <span className="font-black text-lg">@{c.username}</span>
-                      <span className="text-[10px] opacity-40 uppercase font-black tracking-widest">
-                        {format(new Date(c.created_at), 'MMM d')}
-                      </span>
-                    </div>
-                    {!isAuthor && c.user_id !== user?.id && (
-                      <button 
-                        onClick={() => {
-                          setComment(`@${c.username} `);
-                          window.scrollTo({ top: document.querySelector('textarea')?.offsetTop ? document.querySelector('textarea')!.offsetTop - 100 : 0, behavior: 'smooth' });
-                          document.querySelector('textarea')?.focus();
-                        }}
-                        className="text-xs font-black uppercase tracking-widest text-indigo-600 hover:text-indigo-400"
-                      >
-                        Reply
-                      </button>
+            {(() => {
+              const rootComments = blog.comments?.filter((c: any) => !c.parent_id);
+              return rootComments?.map((c: any) => {
+                const replies = blog.comments?.filter((r: any) => r.parent_id === c.id);
+                return (
+                  <div key={c.id} className="space-y-4">
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className={`flex gap-6 p-8 rounded-[2.5rem] border shadow-sm ${cardClasses}`}
+                    >
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold shrink-0 text-lg ${theme === 'orange' ? 'bg-orange-500/10 text-orange-500' : 'bg-indigo-600 text-white'}`}>
+                        {c.photo_url ? <img src={c.photo_url} className="w-full h-full object-cover rounded-full" /> : c.username[0].toUpperCase()}
+                      </div>
+                      <div className="flex-grow">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-3">
+                            <span className="font-black text-lg">@{c.username}</span>
+                            <span className="text-[10px] opacity-40 uppercase font-black tracking-widest">
+                              {formatToIST(c.created_at)}
+                            </span>
+                          </div>
+                          <button 
+                            onClick={() => {
+                              setReplyTo(c);
+                              window.scrollTo({ top: document.querySelector('textarea')?.offsetTop ? document.querySelector('textarea')!.offsetTop - 100 : 0, behavior: 'smooth' });
+                              document.querySelector('textarea')?.focus();
+                            }}
+                            className="text-xs font-black uppercase tracking-widest text-indigo-600 hover:text-indigo-400 flex items-center gap-1"
+                          >
+                            <Reply className="w-3 h-3" /> Reply
+                          </button>
+                        </div>
+                        <p className="text-lg opacity-80 leading-relaxed">{c.content}</p>
+                      </div>
+                    </motion.div>
+                    
+                    {/* Replies */}
+                    {replies && replies.length > 0 && (
+                      <div className="ml-12 space-y-4 border-l-2 border-slate-100 pl-8">
+                        {replies.map((r: any) => (
+                          <div key={r.id} className={`flex gap-4 p-6 rounded-[2rem] border shadow-sm ${cardClasses}`}>
+                             <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold shrink-0 text-sm ${theme === 'orange' ? 'bg-orange-500/10 text-orange-500' : 'bg-indigo-600 text-white'}`}>
+                                {r.photo_url ? <img src={r.photo_url} className="w-full h-full object-cover rounded-full" /> : r.username[0].toUpperCase()}
+                              </div>
+                              <div className="flex-grow">
+                                <span className="font-black text-sm">@{r.username}</span>
+                                <p className="text-md opacity-80 leading-relaxed mt-1">{r.content}</p>
+                              </div>
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
-                  <p className="text-lg opacity-80 leading-relaxed">{c.content}</p>
-                </div>
-              </motion.div>
-            ))}
+                );
+              });
+            })()}
             {(!blog.comments || blog.comments.length === 0) && (
               <div className="text-center py-20 opacity-20">
                 <AlertCircle className="w-12 h-12 mx-auto mb-4" />

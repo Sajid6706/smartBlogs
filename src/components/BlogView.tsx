@@ -175,14 +175,16 @@ export const BlogView = ({
 
   const cardClasses = theme === 'orange' 
     ? 'bg-zinc-900/50 border-orange-500/10' 
-    : 'bg-slate-50 border-transparent backdrop-blur-xl';
+    : theme === 'glass'
+      ? 'glass-card border-white/40 shadow-none'
+      : 'bg-slate-50 border-transparent backdrop-blur-xl shadow-sm';
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-12">
       <div className="flex items-center justify-between mb-8">
         <button 
           onClick={onBack} 
-          className={`p-3 rounded-2xl transition-all border ${theme === 'orange' ? 'border-orange-500/20 hover:bg-orange-500/10 text-orange-500' : 'border-slate-200 hover:bg-slate-100 text-slate-600'}`}
+          className={`p-3 rounded-2xl transition-all border ${theme === 'orange' ? 'border-orange-500/20 hover:bg-orange-500/10 text-orange-500' : theme === 'glass' ? 'border-white/40 bg-white/20 text-indigo-600' : 'border-slate-200 hover:bg-slate-100 text-slate-600'}`}
         >
           <ArrowLeft className="w-6 h-6" />
         </button>
@@ -335,7 +337,7 @@ export const BlogView = ({
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               placeholder={isAuthor ? "Add a thought to your story..." : "Reply to this story..."}
-              className={`w-full p-8 rounded-b-[2.5rem] rounded-t-none border focus:ring-2 outline-none transition-all min-h-[160px] resize-none text-lg ${replyTo ? 'border-t-0' : 'rounded-t-[2.5rem]'} ${theme === 'orange' ? 'bg-black border-orange-500/20 focus:ring-orange-500' : 'bg-white/80 border-slate-200 focus:ring-indigo-500'}`}
+              className={`w-full p-8 rounded-b-[2.5rem] rounded-t-none border focus:ring-2 outline-none transition-all min-h-[160px] resize-none text-lg ${replyTo ? 'border-t-0' : 'rounded-t-[2.5rem]'} ${theme === 'orange' ? 'bg-black border-orange-500/20 focus:ring-orange-500' : theme === 'glass' ? 'bg-white/20 border-white/40 focus:ring-indigo-500 text-indigo-950 placeholder:text-indigo-400' : 'bg-white/80 border-slate-200 focus:ring-indigo-500'}`}
             />
             <button
               disabled={submitting || !comment}

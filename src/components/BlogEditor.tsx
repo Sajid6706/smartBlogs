@@ -147,14 +147,16 @@ export const BlogEditor = ({ blogId, onBack }: { blogId?: number, onBack: () => 
 
   const inputClasses = theme === 'orange' 
     ? 'bg-black border-orange-500/20 focus:ring-orange-500 text-orange-100' 
-    : 'bg-slate-50 border-slate-100 focus:ring-indigo-500 text-slate-900';
+    : theme === 'glass'
+      ? 'bg-white/20 border-white/40 focus:ring-indigo-500 text-indigo-950 placeholder:text-indigo-400'
+      : 'bg-slate-50 border-slate-100 focus:ring-indigo-500 text-slate-900';
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-12">
       <div className="flex items-center justify-between mb-12">
         <button 
           onClick={onBack} 
-          className={`p-3 rounded-2xl transition-all border ${theme === 'orange' ? 'border-orange-500/20 hover:bg-orange-500/10 text-orange-500' : 'border-slate-200 hover:bg-slate-100 text-slate-600'}`}
+          className={`p-3 rounded-2xl transition-all border ${theme === 'orange' ? 'border-orange-500/20 hover:bg-orange-500/10 text-orange-500' : theme === 'glass' ? 'border-white/40 bg-white/20 text-indigo-600 hover:bg-white/40' : 'border-slate-200 hover:bg-slate-100 text-slate-600'}`}
         >
           <ArrowLeft className="w-6 h-6" />
         </button>
@@ -162,7 +164,7 @@ export const BlogEditor = ({ blogId, onBack }: { blogId?: number, onBack: () => 
           <select 
             value={visibility}
             onChange={(e) => setVisibility(e.target.value as 'public' | 'private')}
-            className={`px-6 py-3 rounded-2xl font-black uppercase tracking-widest outline-none border transition-all cursor-pointer ${theme === 'orange' ? 'bg-black border-orange-500/20 text-orange-500 hover:bg-orange-500/5' : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200'}`}
+            className={`px-6 py-3 rounded-2xl font-black uppercase tracking-widest outline-none border transition-all cursor-pointer ${theme === 'orange' ? 'bg-black border-orange-500/20 text-orange-500 hover:bg-orange-500/5' : theme === 'glass' ? 'bg-white/20 border-white/40 text-indigo-600 hover:bg-white/40' : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200'}`}
           >
             <option value="public">🌍 Public</option>
             <option value="private">🔒 Private</option>
@@ -170,7 +172,7 @@ export const BlogEditor = ({ blogId, onBack }: { blogId?: number, onBack: () => 
           <select 
             value={status}
             onChange={(e) => setStatus(e.target.value as 'published' | 'draft')}
-            className={`px-6 py-3 rounded-2xl font-black uppercase tracking-widest outline-none border transition-all cursor-pointer ${theme === 'orange' ? 'bg-black border-orange-500/20 text-orange-500 hover:bg-orange-500/5' : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200'}`}
+            className={`px-6 py-3 rounded-2xl font-black uppercase tracking-widest outline-none border transition-all cursor-pointer ${theme === 'orange' ? 'bg-black border-orange-500/20 text-orange-500 hover:bg-orange-500/5' : theme === 'glass' ? 'bg-white/20 border-white/40 text-indigo-600 hover:bg-white/40' : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200'}`}
           >
             <option value="published">🚀 Published</option>
             <option value="draft">🖊️ Draft</option>
@@ -178,7 +180,7 @@ export const BlogEditor = ({ blogId, onBack }: { blogId?: number, onBack: () => 
           {blogId && (
             <button 
               onClick={() => setShowHistory(!showHistory)}
-              className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-black uppercase tracking-widest transition-all border ${theme === 'orange' ? 'border-orange-500/20 text-orange-500 hover:bg-orange-500/5' : 'border-slate-200 text-slate-600 hover:bg-slate-100'}`}
+              className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-black uppercase tracking-widest transition-all border ${theme === 'orange' ? 'border-orange-500/20 text-orange-500 hover:bg-orange-500/5' : theme === 'glass' ? 'border-white/40 bg-white/20 text-indigo-600 hover:bg-white/40' : 'border-slate-200 text-slate-600 hover:bg-slate-100'}`}
             >
               <History className="w-5 h-5" /> History
             </button>
@@ -200,7 +202,7 @@ export const BlogEditor = ({ blogId, onBack }: { blogId?: number, onBack: () => 
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Enter a catchy title..."
-          className={`w-full text-5xl font-black placeholder:opacity-20 outline-none border-none bg-transparent italic uppercase tracking-tighter ${theme === 'orange' ? 'text-orange-100' : 'text-slate-900'}`}
+          className={`w-full text-5xl font-black placeholder:opacity-20 outline-none border-none bg-transparent italic uppercase tracking-tighter ${theme === 'orange' ? 'text-orange-100' : theme === 'glass' ? 'text-indigo-950/80 hover:text-indigo-950' : 'text-slate-900'}`}
         />
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, ShieldCheck, Loader2, Lock, User as UserIcon, ArrowLeft, Moon, Info, Zap, Sun, UserCircle } from 'lucide-react';
+import { Mail, ShieldCheck, Loader2, Lock, User as UserIcon, ArrowLeft, Moon, Info, Zap, Sun, UserCircle, Droplets } from 'lucide-react';
 import emailjs from '@emailjs/browser';
 import { useStore } from '../store';
 import { motion, AnimatePresence } from 'motion/react';
@@ -228,23 +228,31 @@ export const Auth = () => {
     switch (theme) {
       case 'orange': return 'bg-black text-[#ff8c00]';
       case 'light': return 'bg-white text-slate-900';
+      case 'glass': return 'theme-glass min-h-screen';
       default: return 'bg-white text-slate-900';
     }
+  };
+
+  const toggleTheme = () => {
+    if (theme === 'light') setTheme('orange');
+    else if (theme === 'orange') setTheme('glass');
+    else setTheme('light');
   };
 
   return (
     <div className={`min-h-screen flex flex-col transition-colors duration-300 ${getThemeClasses()}`}>
       {/* Navbar */}
-      <nav className={`flex items-center justify-between px-8 py-4 border-b ${theme === 'orange' ? 'border-orange-900/30' : 'border-slate-200'}`}>
+      <nav className={`flex items-center justify-between px-8 py-4 border-b transition-all duration-300 ${theme === 'orange' ? 'border-orange-900/30' : theme === 'glass' ? 'border-white/20 bg-white/10 backdrop-blur-md' : 'border-slate-200'}`}>
         <div className="text-3xl font-black tracking-tighter uppercase italic cursor-pointer" onClick={() => { setMode('login'); setStep('info'); }}>
-          Smart Blog
+          <span className={theme === 'glass' ? 'text-indigo-600' : ''}>Smart</span> Blog
         </div>
         <div className="flex items-center gap-6">
           <button 
-            onClick={() => setTheme(theme === 'light' ? 'orange' : 'light')}
-            className={`p-2 rounded-full transition-colors ${theme === 'orange' ? 'hover:bg-orange-500/10' : 'hover:bg-slate-200'}`}
+            onClick={toggleTheme}
+            className={`p-2 rounded-full transition-colors ${theme === 'orange' ? 'hover:bg-orange-500/10' : theme === 'glass' ? 'hover:bg-white/20 text-indigo-600' : 'hover:bg-slate-200'}`}
+            title="Toggle Theme"
           >
-            {theme === 'light' ? <Moon className="w-6 h-6" /> : <Sun className="w-6 h-6" />}
+            {theme === 'light' ? <Moon className="w-6 h-6" /> : theme === 'orange' ? <Sun className="w-6 h-6" /> : <Droplets className="w-6 h-6" />}
           </button>
           <button 
             onClick={() => setShowAbout(true)}
@@ -331,7 +339,7 @@ export const Auth = () => {
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className={`p-8 rounded-[2rem] border backdrop-blur-xl shadow-2xl ${theme === 'orange' ? 'bg-zinc-900/50 border-orange-500/20' : 'bg-white/80 border-slate-200'}`}
+            className={`p-8 rounded-[2rem] border transition-all shadow-2xl ${theme === 'orange' ? 'bg-zinc-900/50 border-orange-500/20 backdrop-blur-xl' : theme === 'glass' ? 'glass-card border-white/40' : 'bg-white/80 border-slate-200 backdrop-blur-xl'}`}
           >
             <h2 className="text-3xl font-black mb-8 text-center uppercase tracking-tight">
               {step === 'otp' ? 'Verify OTP' : step === 'otp-reset' ? 'Verify OTP' : step === 'new-password' ? 'New Password' : step === 'forgot-password' ? 'Reset Password' : mode === 'login' ? 'Login' : 'Register'}
@@ -367,7 +375,7 @@ export const Auth = () => {
                           type="text"
                           value={username}
                           onChange={(e) => setUsername(e.target.value)}
-                          className={`w-full pl-12 pr-4 py-4 border rounded-2xl focus:ring-2 outline-none transition-all ${theme === 'orange' ? 'bg-black border-orange-500/20 focus:ring-orange-500 text-orange-100' : 'bg-white border-slate-200 focus:ring-indigo-500 text-slate-900'}`}
+                          className={`w-full pl-12 pr-4 py-4 border rounded-2xl focus:ring-2 outline-none transition-all ${theme === 'orange' ? 'bg-black border-orange-500/20 focus:ring-orange-500 text-orange-100' : theme === 'glass' ? 'bg-white/20 border-white/40 focus:ring-indigo-500 text-indigo-950 placeholder:text-indigo-400' : 'bg-white border-slate-200 focus:ring-indigo-500 text-slate-900'}`}
                           placeholder="johndoe"
                         />
                       </div>
@@ -396,7 +404,7 @@ export const Auth = () => {
                         type="password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className={`w-full pl-12 pr-4 py-4 border rounded-2xl focus:ring-2 outline-none transition-all ${theme === 'orange' ? 'bg-black border-orange-500/20 focus:ring-orange-500 text-orange-100' : 'bg-white border-slate-200 focus:ring-indigo-500 text-slate-900'}`}
+                        className={`w-full pl-12 pr-4 py-4 border rounded-2xl focus:ring-2 outline-none transition-all ${theme === 'orange' ? 'bg-black border-orange-500/20 focus:ring-orange-500 text-orange-100' : theme === 'glass' ? 'bg-white/20 border-white/40 focus:ring-indigo-500 text-indigo-950 placeholder:text-indigo-400' : 'bg-white border-slate-200 focus:ring-indigo-500 text-slate-900'}`}
                         placeholder="••••••••"
                       />
                     </div>
@@ -473,7 +481,7 @@ export const Auth = () => {
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className={`w-full pl-12 pr-4 py-4 border rounded-2xl focus:ring-2 outline-none transition-all ${theme === 'orange' ? 'bg-black border-orange-500/20 focus:ring-orange-500 text-orange-100' : 'bg-white border-slate-200 focus:ring-indigo-500 text-slate-900'}`}
+                        className={`w-full pl-12 pr-4 py-4 border rounded-2xl focus:ring-2 outline-none transition-all ${theme === 'orange' ? 'bg-black border-orange-500/20 focus:ring-orange-500 text-orange-100' : theme === 'glass' ? 'bg-white/20 border-white/40 focus:ring-indigo-500 text-indigo-950 placeholder:text-indigo-400' : 'bg-white border-slate-200 focus:ring-indigo-500 text-slate-900'}`}
                         placeholder="you@example.com"
                       />
                     </div>
@@ -481,7 +489,7 @@ export const Auth = () => {
                   <button
                     disabled={loading}
                     type="submit"
-                    className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg ${theme === 'orange' ? 'bg-[#ff8c00] text-black shadow-orange-500/20 hover:bg-orange-400' : 'bg-indigo-600 text-white shadow-indigo-200 hover:bg-indigo-700'}`}
+                    className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg ${theme === 'orange' ? 'bg-[#ff8c00] text-black shadow-orange-500/20 hover:bg-orange-400' : theme === 'glass' ? 'bg-indigo-600 text-white shadow-indigo-500/20' : 'bg-indigo-600 text-white shadow-indigo-200 hover:bg-indigo-700'}`}
                   >
                     {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : 'Send Reset Code'}
                   </button>
@@ -510,14 +518,14 @@ export const Auth = () => {
                       maxLength={6}
                       value={otp}
                       onChange={(e) => setOtp(e.target.value)}
-                      className={`w-full px-4 py-6 text-center text-4xl tracking-[0.5em] border rounded-2xl focus:ring-2 outline-none transition-all font-black ${theme === 'orange' ? 'bg-black border-orange-500/20 focus:ring-orange-500 text-orange-100' : 'bg-white border-slate-200 focus:ring-indigo-500 text-slate-900'}`}
+                      className={`w-full px-4 py-6 text-center text-4xl tracking-[0.5em] border rounded-2xl focus:ring-2 outline-none transition-all font-black ${theme === 'orange' ? 'bg-black border-orange-500/20 focus:ring-orange-500 text-orange-100' : theme === 'glass' ? 'bg-white/20 border-white/40 focus:ring-indigo-500 text-indigo-950 placeholder:text-indigo-400' : 'bg-white border-slate-200 focus:ring-indigo-500 text-slate-900'}`}
                       placeholder="000000"
                     />
                   </div>
                   <button
                     disabled={loading}
                     type="submit"
-                    className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg ${theme === 'orange' ? 'bg-[#ff8c00] text-black shadow-orange-500/20 hover:bg-orange-400' : 'bg-indigo-600 text-white shadow-indigo-200 hover:bg-indigo-700'}`}
+                    className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg ${theme === 'orange' ? 'bg-[#ff8c00] text-black shadow-orange-500/20 hover:bg-orange-400' : theme === 'glass' ? 'bg-indigo-600 text-white shadow-indigo-500/20' : 'bg-indigo-600 text-white shadow-indigo-200 hover:bg-indigo-700'}`}
                   >
                     {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : 'Verify Code'}
                   </button>
@@ -547,7 +555,7 @@ export const Auth = () => {
                         type="password"
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
-                        className={`w-full pl-12 pr-4 py-4 border rounded-2xl focus:ring-2 outline-none transition-all ${theme === 'orange' ? 'bg-black border-orange-500/20 focus:ring-orange-500 text-orange-100' : 'bg-white border-slate-200 focus:ring-indigo-500 text-slate-900'}`}
+                        className={`w-full pl-12 pr-4 py-4 border rounded-2xl focus:ring-2 outline-none transition-all ${theme === 'orange' ? 'bg-black border-orange-500/20 focus:ring-orange-500 text-orange-100' : theme === 'glass' ? 'bg-white/20 border-white/40 focus:ring-indigo-500 text-indigo-950 placeholder:text-indigo-400' : 'bg-white border-slate-200 focus:ring-indigo-500 text-slate-900'}`}
                         placeholder="••••••••"
                       />
                     </div>
@@ -555,7 +563,7 @@ export const Auth = () => {
                   <button
                     disabled={loading}
                     type="submit"
-                    className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg ${theme === 'orange' ? 'bg-[#ff8c00] text-black shadow-orange-500/20 hover:bg-orange-400' : 'bg-indigo-600 text-white shadow-indigo-200 hover:bg-indigo-700'}`}
+                    className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg ${theme === 'orange' ? 'bg-[#ff8c00] text-black shadow-orange-500/20 hover:bg-orange-400' : theme === 'glass' ? 'bg-indigo-600 text-white shadow-indigo-500/20' : 'bg-indigo-600 text-white shadow-indigo-200 hover:bg-indigo-700'}`}
                   >
                     {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : 'Reset Password'}
                   </button>
@@ -577,14 +585,14 @@ export const Auth = () => {
                       maxLength={6}
                       value={otp}
                       onChange={(e) => setOtp(e.target.value)}
-                      className={`w-full px-4 py-6 text-center text-4xl tracking-[0.5em] border rounded-2xl focus:ring-2 outline-none transition-all font-black ${theme === 'orange' ? 'bg-black border-orange-500/20 focus:ring-orange-500 text-orange-100' : 'bg-white border-slate-200 focus:ring-indigo-500 text-slate-900'}`}
+                      className={`w-full px-4 py-6 text-center text-4xl tracking-[0.5em] border rounded-2xl focus:ring-2 outline-none transition-all font-black ${theme === 'orange' ? 'bg-black border-orange-500/20 focus:ring-orange-500 text-orange-100' : theme === 'glass' ? 'bg-white/20 border-white/40 focus:ring-indigo-500 text-indigo-950 placeholder:text-indigo-400' : 'bg-white border-slate-200 focus:ring-indigo-500 text-slate-900'}`}
                       placeholder="000000"
                     />
                   </div>
                   <button
                     disabled={loading}
                     type="submit"
-                    className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg ${theme === 'orange' ? 'bg-[#ff8c00] text-black shadow-orange-500/20 hover:bg-orange-400' : 'bg-indigo-600 text-white shadow-indigo-200 hover:bg-indigo-700'}`}
+                    className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg ${theme === 'orange' ? 'bg-[#ff8c00] text-black shadow-orange-500/20 hover:bg-orange-400' : theme === 'glass' ? 'bg-indigo-600 text-white shadow-indigo-500/20' : 'bg-indigo-600 text-white shadow-indigo-200 hover:bg-indigo-700'}`}
                   >
                     {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : 'Verify & Register'}
                   </button>
@@ -603,10 +611,10 @@ export const Auth = () => {
       </main>
 
       {/* Footer */}
-      <footer className={`px-8 py-6 border-t ${theme === 'orange' ? 'border-orange-900/30 bg-zinc-950' : 'border-slate-200 bg-white'}`}>
+      <footer className={`px-8 py-6 border-t font-medium transition-all duration-300 ${theme === 'orange' ? 'border-orange-900/30 bg-zinc-950 text-orange-500/60' : theme === 'glass' ? 'border-white/20 bg-white/10 backdrop-blur-md text-indigo-900/60' : 'border-slate-200 bg-white text-slate-400'}`}>
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
           <div className="text-2xl font-black tracking-tighter uppercase italic">
-            Smart Blog
+            <span className={theme === 'glass' ? 'text-indigo-600' : ''}>Smart</span> Blog
           </div>
           <div className={`flex gap-8 text-sm font-bold ${theme === 'orange' ? 'text-orange-500/60' : 'text-slate-400'}`}>
             <a href="#" className="hover:opacity-80 transition-opacity">Privacy Policy</a>
